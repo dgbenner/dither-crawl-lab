@@ -25,7 +25,7 @@ The text field's real font size matches the canvas font (8 logical pixels per ch
 
 | Control | Range | Default | What it does |
 |---|---|---|---|
-| Crawl speed | 0–60 updates/s | 12 | How often the noise changes. 0 freezes the dots completely. |
+| Crawl speed | 0–60 updates/s | 2 | How often the noise changes. 0 freezes the dots completely. |
 | Churn | 2–100% | 35% | Share of the noise re-rolled on each update. Low = slow simmer, 100% = full reshuffle every update. Applies to Random noise only. |
 | Noise pattern | Random / Ordered 8×8 / Gradient | Random | The texture of the dots (see below). |
 
@@ -39,9 +39,9 @@ The text field's real font size matches the canvas font (8 logical pixels per ch
 
 | Control | Range | Default | What it does |
 |---|---|---|---|
-| Offset down | −10 to 16 px | 4 | Moves the shadow below (positive) or above (negative) the element. 0 gives an even halo. |
-| Offset right | −10 to 10 px | 0 | Moves the shadow sideways. |
-| Spread | 2–32 px | 12 | How far the dots reach past the shape. |
+| Offset down | −10 to 16 px | 1 | Moves the shadow below (positive) or above (negative) the element. 0 gives an even halo. |
+| Offset right | −10 to 10 px | −1 | Moves the shadow sideways. |
+| Spread | 2–32 px | 4 | How far the dots reach past the shape. |
 | Falloff | 0.5–3.0 | 1.7 | How fast the dots thin out. Higher pulls them in tight to the edge; lower gives a long, soft fade. |
 | Density | 20–120% | 75% | Overall darkness of the shadow. Above 100% makes a solid core. |
 | Shadow grows on hover and focus | on/off | on | Hover or keyboard focus raises the element: the offset grows 80% and the spread 45%. Pressing the button pushes it down (offset shrinks 75%). |
@@ -53,7 +53,7 @@ Pixel values are logical pixels, so they scale with Pixel size.
 | Control | Range | Default | What it does |
 |---|---|---|---|
 | Pixel size | 2×, 3×, 4× | 3× (2× on narrow screens) | Screen pixels per logical pixel. Bigger = chunkier. The whole layout scales with it. |
-| Palette | 7 presets + Custom | Sage | Three colors: screen, dots, ink. |
+| Palette | 7 presets + Custom | Light grey, dark grey | Three colors: screen, dots, ink. |
 | Color pickers | any color | from palette | Screen, Dots and Ink. Changing any of them switches to Custom. |
 | LCD pixel grid | on/off | on | Faint grid lines between pixels, like a real LCD. |
 
@@ -72,7 +72,7 @@ Pixel values are logical pixels, so they scale with Pixel size.
 
 - Changes are saved in your browser automatically.
 - **Copy settings** copies the current values and colors as JSON, ready to paste into a chat.
-- **Reset** returns to the Reference preset and the Sage palette, keeping your pixel size.
+- **Reset** returns to the Reference preset and the Light grey, dark grey palette, keeping your pixel size.
 
 ---
 
@@ -80,7 +80,7 @@ Pixel values are logical pixels, so they scale with Pixel size.
 
 | Preset | Speed | Churn | Noise | Spread | Falloff | Density | Offset down |
 |---|---|---|---|---|---|---|---|
-| Reference | 12 | 35% | Random | 12 | 1.7 | 75% | 4 |
+| Reference | 2 | 35% | Random | 4 | 1.7 | 75% | 1 |
 | Calm | 5 | 12% | Random | 12 | 1.7 | 75% | 4 |
 | Boiling | 30 | 100% | Random | 16 | 1.1 | 100% | 3 |
 | Ordered | 8 | n/a | Ordered 8×8 | 12 | 1.7 | 75% | 4 |
