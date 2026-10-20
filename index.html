@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dither Crawl Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an LCD "screen" set in a dark handheld bezel, with a spec-sheet control column beside it. */
+:root {
+  --bg: #e7e9e1;
+  --fg: #1d2318;
+  --muted: #59624f;
+  --line: #c6cbbb;
+  --panel: #f2f3ee;
+  --bezel: #262b21;
+  --bezel-hi: #3a4132;
+  --accent: #4b6a2a;
+  --flip: #d6336c;
+  --display: "Silkscreen", "Press Start 2P", ui-monospace, monospace;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13160f; --fg: #dfe4d4; --muted: #9aa38c; --line: #2d3326; --panel: #1b1f16;
+    --bezel: #0a0c08; --bezel-hi: #22281c; --accent: #a8c46b; --flip: #f0568f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13160f; --fg: #dfe4d4; --muted: #9aa38c; --line: #2d3326; --panel: #1b1f16;
+  --bezel: #0a0c08; --bezel-hi: #22281c; --accent: #a8c46b; --flip: #f0568f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1240px; margin: 0 auto; padding-block: 28px 48px; display: grid; gap: 22px; }
+
+header { display: grid; gap: 6px; }
+h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(26px, 4vw, 40px);
+  line-height: 1.05;
+  margin: 0;
+  letter-spacing: 0.02em;
+  text-wrap: balance;
+}
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+/* Keep the screen in view while adjusting controls. */
+@media (min-width: 901px) {
+  .bezel { position: sticky; top: 16px; }
+  .panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+}
+@media (max-width: 900px) {
+  .panel {
+    position: sticky; bottom: 0; z-index: 5;
+    max-height: 46vh; overflow-y: auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.22);
+  }
+}
+.colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.colors label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.colors input[type="color"] { width: 100%; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); cursor: pointer; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.actions button {
+  font: inherit; font-size: 12.5px; font-family: var(--mono);
+  padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+.actions button:hover { border-color: var(--accent); }
+.actions .status { font-size: 12.5px; color: var(--muted); }
+
+/* Bezel: the lower-right corner is cut round, like the original handheld. */
+.bezel {
+  background: linear-gradient(180deg, var(--bezel-hi), var(--bezel) 40%);
+  padding: 14px 14px 22px;
+  border-radius: 12px 12px 48px 12px;
+  min-width: 0;
+}
+.bezel-label {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #8c9580; padding: 0 4px 10px;
+}
+.led { display: inline-flex; align-items: center; gap: 8px; }
+.led::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #c8324f; box-shadow: 0 0 6px #c8324f; }
+
+#stage {
+  --px: 3;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #a4ad8a;
+}
+#screen {
+  position: absolute; left: 0; top: 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+  z-index: 2;
+}
+#lcd {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.07) 1px, transparent 1px);
+  background-size: calc(var(--px) * 1px) calc(var(--px) * 1px);
+}
+#lcd[hidden] { display: none; }
+
+/* The real HTML. Invisible, but it receives every click, keystroke and focus. */
+.ui {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: calc(var(--px) * 100px);
+}
+.ui.stack { grid-template-columns: 1fr; grid-auto-rows: calc(var(--px) * 92px); }
+.cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--px) * 8px); min-width: 0; }
+.row { display: flex; align-items: center; gap: calc(var(--px) * 8px); }
+
+.ghost {
+  opacity: 0;
+  font-family: "Press Start 2P", monospace;
+  font-size: calc(var(--px) * 8px);
+  line-height: 1;
+  color: #000;
+  background: transparent;
+  border: 0;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  letter-spacing: 0;
+}
+.ghost:focus { outline: none; }
+input.field {
+  width: min(calc(var(--px) * 120px), 88%);
+  height: calc(var(--px) * 16px);
+  padding: 0 calc(var(--px) * 12px);
+  caret-color: transparent;
+}
+.seg { display: flex; padding: calc(var(--px) * 2px); }
+.seg label { display: block; position: relative; padding: calc(var(--px) * 2.5px) calc(var(--px) * 8px); cursor: pointer; }
+.seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.view { width: calc(var(--px) * 96px); height: calc(var(--px) * 66px); }
+input.switch { width: calc(var(--px) * 26px); height: calc(var(--px) * 14px); cursor: pointer; }
+.tlabel { padding: calc(var(--px) * 1px) 0; }
+button.btn { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 12px); cursor: pointer; white-space: nowrap; }
+
+#stage.reveal .ui { z-index: 4; }
+#stage.reveal .ghost { opacity: 0.75; outline: 1px dashed var(--flip); background: color-mix(in srgb, var(--flip) 10%, transparent); }
+
+/* Control column */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.readout { display: grid; gap: 2px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.readout .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.readout .v { font-family: var(--display); font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.readout .s { font-size: 13px; color: var(--muted); }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; }
+legend { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); padding: 0; margin-bottom: 10px; font-weight: 500; }
+.ctl { display: grid; gap: 4px; }
+.ctl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13.5px; }
+.ctl-top output { font-family: var(--mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hint { font-size: 12.5px; color: var(--muted); margin: -2px 0 0; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13.5px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button {
+  font: inherit; font-size: 12.5px; font-family: var(--mono);
+  padding: 5px 9px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+.presets button:hover { border-color: var(--accent); }
+.presets button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.panel :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.note { font-size: 13px; color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 6px; padding: 8px 10px; margin: 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--flip); vertical-align: -1px; margin-right: 4px; }
+
+.how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; border-top: 1px solid var(--line); padding-top: 18px; }
+@media (max-width: 760px) { .how { grid-template-columns: minmax(0, 1fr); } }
+.how h2 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin: 0 0 6px; font-weight: 500; }
+.how p { margin: 0; font-size: 14px; color: var(--muted); max-width: 52ch; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<main>
+  <header>
+    <h1>Dither Crawl Lab</h1>
+    <p class="lede">Halftone shadows on live UI. Each shadow is one soft shape, and every pixel is a dot or not depending on a noise value that keeps changing. Pixels deep in the shadow always come out dark, pixels far away always come out empty, and the ones at the edge flip back and forth. That flipping is the crawl.</p>
+  </header>
+
+  <div class="bench">
+    <div class="bezel">
+      <div class="bezel-label"><span class="led">Power</span><span>Dot matrix with stereo sound</span></div>
+      <div id="stage">
+        <canvas id="screen" aria-hidden="true"></canvas>
+        <div id="lcd" aria-hidden="true"></div>
+        <div class="ui" id="ui">
+          <div class="cell">
+            <label for="f-text" class="sr">Email address</label>
+            <input id="f-text" class="ghost field" type="text" value="dan@dmg.dev" placeholder="Type here" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="cell">
+            <div class="ghost seg" id="f-seg" role="radiogroup" aria-label="View">
+              <label class="ghost"><input type="radio" name="view" value="table" id="f-view-table" checked>Table</label>
+              <label class="ghost"><input type="radio" name="view" value="chart" id="f-view-chart">Chart</label>
+            </div>
+            <div class="ghost view" id="f-view" role="img" aria-label="Visits by day: Monday 120, Tuesday 180, Wednesday 90, Thursday 210, Friday 160, Saturday 60, Sunday 75"></div>
+          </div>
+          <div class="cell">
+            <div class="row">
+              <label for="f-toggle" class="ghost tlabel" id="f-tlabel">Sound</label>
+              <input id="f-toggle" class="ghost switch" type="checkbox" role="switch">
+            </div>
+          </div>
+          <div class="cell">
+            <button id="f-btn" class="ghost btn" type="button">Delete project</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel" aria-label="Effect controls">
+      <div class="readout" aria-live="off">
+        <span class="k">Crawl activity</span>
+        <span class="v" id="activity">0.0%</span>
+        <span class="s">of shadow pixels changed on the last noise update</span>
+      </div>
+
+      <div>
+        <div class="presets" role="group" aria-label="Presets">
+          <button type="button" data-preset="reference" aria-pressed="true">Reference</button>
+          <button type="button" data-preset="calm" aria-pressed="false">Calm</button>
+          <button type="button" data-preset="boil" aria-pressed="false">Boiling</button>
+          <button type="button" data-preset="ordered" aria-pressed="false">Ordered</button>
+        </div>
+      </div>
+
+      <p class="note" id="rm-note" hidden>Your system asks for reduced motion, so the crawl starts paused. Raise Crawl speed to see it.</p>
+
+      <fieldset>
+        <legend>Crawl</legend>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-rate">Crawl speed</label><output id="o-rate" for="c-rate"></output></div>
+          <input type="range" id="c-rate" data-key="rate" min="0" max="60" step="1">
+          <p class="hint">How often the noise updates. 0 freezes the dots.</p>
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-churn">Churn</label><output id="o-churn" for="c-churn"></output></div>
+          <input type="range" id="c-churn" data-key="churn" min="0.02" max="1" step="0.01">
+          <p class="hint">Share of the noise re-rolled on each update. Low is a slow simmer, 100% is a full reshuffle. Random noise only.</p>
+        </div>
+        <div class="ctl">
+          <label for="c-noise" class="ctl-top">Noise pattern</label>
+          <select id="c-noise" data-key="noise">
+            <option value="white">Random (stipple)</option>
+            <option value="bayer">Ordered 8×8, jittered</option>
+            <option value="ign">Gradient noise</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Shadow</legend>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-oy">Offset down</label><output id="o-oy" for="c-oy"></output></div>
+          <input type="range" id="c-oy" data-key="oy" min="-10" max="16" step="1">
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-ox">Offset right</label><output id="o-ox" for="c-ox"></output></div>
+          <input type="range" id="c-ox" data-key="ox" min="-10" max="10" step="1">
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-spread">Spread</label><output id="o-spread" for="c-spread"></output></div>
+          <input type="range" id="c-spread" data-key="spread" min="2" max="32" step="1">
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-falloff">Falloff</label><output id="o-falloff" for="c-falloff"></output></div>
+          <input type="range" id="c-falloff" data-key="falloff" min="0.5" max="3" step="0.1">
+          <p class="hint">Higher pulls the dots in tight to the edge.</p>
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-density">Density</label><output id="o-density" for="c-density"></output></div>
+          <input type="range" id="c-density" data-key="density" min="0.2" max="1.2" step="0.05">
+        </div>
+        <label class="check"><input type="checkbox" id="c-lift" data-key="lift"> Shadow grows on hover and focus</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Screen</legend>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-scale">Pixel size</label><output id="o-scale" for="c-scale"></output></div>
+          <input type="range" id="c-scale" data-key="scale" min="2" max="4" step="1">
+        </div>
+        <div class="ctl">
+          <label for="c-palette" class="ctl-top">Palette</label>
+          <select id="c-palette" data-key="palette">
+            <option value="sage">Sage (like the reference)</option>
+            <option value="dmg">Original green</option>
+            <option value="pocket">Pocket grey</option>
+            <option value="lightgrey">Light grey, dark grey</option>
+            <option value="graphite">Graphite, light grey</option>
+            <option value="c64">C64 blue</option>
+            <option value="amber">Amber on black</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="colors">
+          <label for="c-col-bg">Screen<input type="color" id="c-col-bg"></label>
+          <label for="c-col-dot">Dots<input type="color" id="c-col-dot"></label>
+          <label for="c-col-ink">Ink<input type="color" id="c-col-ink"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="c-grid" data-key="grid"> LCD pixel grid</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Inspect</legend>
+        <label class="check"><input type="checkbox" id="c-flips" data-key="flips"> <span><span class="swatch"></span>Highlight crawling pixels</span></label>
+        <label class="check"><input type="checkbox" id="c-reveal" data-key="reveal"> Show the hidden HTML</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Settings</legend>
+        <div class="actions">
+          <button type="button" id="copy-settings">Copy settings</button>
+          <button type="button" id="reset-settings">Reset</button>
+          <span class="status" id="settings-status" role="status"></span>
+        </div>
+        <p class="hint">Your changes are remembered in this browser. Copy settings gives you the numbers to paste into a chat.</p>
+      </fieldset>
+    </aside>
+  </div>
+
+  <section class="how" aria-label="How this page is built">
+    <div>
+      <h2>Real HTML underneath</h2>
+      <p>The text field, tabs, switch and button are ordinary form elements with zero opacity. They take the clicks, typing, focus and screen reader. Turn on "Show the hidden HTML" to see them.</p>
+    </div>
+    <div>
+      <h2>Custom renderer on top</h2>
+      <p>A low-resolution canvas reads each element's position and state every frame (value, caret, checked, hover, focus) and redraws it in three colors, then scales up with hard pixel edges.</p>
+    </div>
+    <div>
+      <h2>Shadow by threshold</h2>
+      <p>Shadow strength at each pixel is compared to a noise value. Re-rolling part of the noise each update moves only the in-between pixels, so the core holds still and the fringe crawls.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const stage = $('#stage'), ui = $('#ui'), screen = $('#screen'), lcd = $('#lcd');
+  const sctx = screen.getContext('2d');
+  const ink = document.createElement('canvas');
+  const ictx = ink.getContext('2d', { willReadFrequently: true });
+
+  const elText = $('#f-text'), elSeg = $('#f-seg'), elView = $('#f-view');
+  const elToggle = $('#f-toggle'), elTLabel = $('#f-tlabel'), elBtn = $('#f-btn');
+  const segOpts = [...elSeg.querySelectorAll('label')];
+  const segRadios = [...elSeg.querySelectorAll('input')];
+
+  const PRESETS = {
+    reference: { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 12, churn: 0.35, noise: 'white' },
+    calm:      { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 5,  churn: 0.12, noise: 'white' },
+    boil:      { oy: 3, ox: 0, spread: 16, falloff: 1.1, density: 1.0, rate: 30, churn: 1.0,  noise: 'white' },
+    ordered:   { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 8,  churn: 0.35, noise: 'bayer' },
+  };
+  const P = Object.assign({ scale: 3, palette: 'sage', grid: true, lift: true, flips: false, reveal: false }, PRESETS.reference);
+
+  // [background, dots, ink]
+  const PALETTES = {
+    sage:   ['#a4ad8a', '#4f5c3e', '#36412b'],
+    dmg:    ['#9bbc0f', '#306230', '#0f380f'],
+    pocket: ['#c4c4b8', '#6d6d63', '#2b2b27'],
+    lightgrey: ['#d6d6d3', '#5e5e5b', '#2c2c2a'],
+    graphite:  ['#2e2f31', '#8a8c8f', '#e2e3e4'],
+    c64:    ['#352879', '#6c5eb5', '#b3abf2'],
+    amber:  ['#17140c', '#a6761d', '#f2c14e'],
+    custom: ['#d6d6d3', '#5e5e5b', '#2c2c2a'],
+  };
+  const colorInputs = [$('#c-col-bg'), $('#c-col-dot'), $('#c-col-ink')];
+  const FLIP_ON = '#d6336c', FLIP_OFF = '#e88aaa';
+  const pack = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    return ((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | ((n >> 16) & 255)) >>> 0;
+  };
+  let C = {};
+  function setPalette() {
+    if (P.custom) PALETTES.custom = P.custom.slice();
+    const p = PALETTES[P.palette] || PALETTES.sage;
+    colorInputs.forEach((inp, i) => { if (inp.value !== p[i]) inp.value = p[i]; });
+    C = { bg: pack(p[0]), dot: pack(p[1]), ink: pack(p[2]), fOn: pack(FLIP_ON), fOff: pack(FLIP_OFF) };
+    stage.style.background = p[0];
+  }
+
+  // Bayer 8x8
+  const B8 = (() => {
+    const m = [[0, 2], [3, 1]];
+    let b = m;
+    for (let n = 2; n < 8; n *= 2) {
+      const nb = [];
+      for (let y = 0; y < n * 2; y++) {
+        nb.push([]);
+        for (let x = 0; x < n * 2; x++) {
+          const q = (y < n ? 0 : 2) + (x < n ? 0 : 1);
+          const add = [0, 2, 3, 1][q];
+          nb[y].push(4 * b[y % n][x % n] + add);
+        }
+      }
+      b = nb;
+    }
+    return Float32Array.from(b.flat(), (v) => (v + 0.5) / 64);
+  })();
+
+  let W = 1, H = 1, img, buf, noise, prev, flip, stageRect;
+  let bx = 0, by = 0, fo = 0;
+  let lastFlips = 0, lastDots = 0, ticked = false;
+
+  function resize() {
+    const s = P.scale;
+    const w = stage.clientWidth;
+    ui.classList.toggle('stack', w < 2 * 125 * s);
+    const h = stage.clientHeight;
+    const nW = Math.max(1, Math.floor(w / s)), nH = Math.max(1, Math.floor(h / s));
+    if (nW === W && nH === H && img) return;
+    W = nW; H = nH;
+    screen.width = W; screen.height = H;
+    screen.style.width = W * s + 'px'; screen.style.height = H * s + 'px';
+    ink.width = W; ink.height = H;
+    img = sctx.createImageData(W, H);
+    buf = new Uint32Array(img.data.buffer);
+    noise = new Float32Array(W * H);
+    for (let i = 0; i < noise.length; i++) noise[i] = Math.random();
+    prev = new Uint8Array(W * H);
+    flip = new Uint8Array(W * H);
+  }
+
+  function tick() {
+    if (P.noise === 'white') {
+      const c = P.churn;
+      if (c >= 1) { for (let i = 0; i < noise.length; i++) noise[i] = Math.random(); }
+      else { for (let i = 0; i < noise.length; i++) if (Math.random() < c) noise[i] = Math.random(); }
+    } else if (P.noise === 'bayer') {
+      let nx, ny;
+      do { nx = (Math.random() * 8) | 0; ny = (Math.random() * 8) | 0; } while (nx === bx && ny === by);
+      bx = nx; by = ny;
+    } else {
+      fo = Math.random() * 97;
+    }
+    ticked = true;
+  }
+
+  // Interaction state per shape
+  const S = {
+    text:   { hover: false, focus: false, lift: 0, press: 0 },
+    seg:    { hover: false, focus: false, lift: 0, press: 0, t: 0 },
+    toggle: { hover: false, focus: false, lift: 0, press: 0, t: 0 },
+    btn:    { hover: false, focus: false, lift: 0, press: 0, down: false, until: 0 },
+  };
+  let viewAnim = 1;
+  function bindHover(el, st) {
+    el.addEventListener('pointerenter', () => (st.hover = true));
+    el.addEventListener('pointerleave', () => { st.hover = false; if (st === S.btn) st.down = false; });
+    el.addEventListener('focusin', () => (st.focus = true));
+    el.addEventListener('focusout', () => (st.focus = false));
+  }
+  bindHover(elText, S.text); bindHover(elSeg, S.seg); bindHover(elToggle, S.toggle); bindHover(elBtn, S.btn);
+  elTLabel.addEventListener('pointerenter', () => (S.toggle.hover = true));
+  elTLabel.addEventListener('pointerleave', () => (S.toggle.hover = false));
+  elBtn.addEventListener('pointerdown', () => (S.btn.down = true));
+  window.addEventListener('pointerup', () => (S.btn.down = false));
+  elBtn.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') S.btn.down = true; });
+  elBtn.addEventListener('keyup', () => (S.btn.down = false));
+  elBtn.addEventListener('click', () => (S.btn.until = performance.now() + 160));
+  segRadios.forEach((r) => r.addEventListener('change', () => (viewAnim = 0)));
+
+  function rectOf(el) {
+    const r = el.getBoundingClientRect(), s = P.scale;
+    const x0 = Math.round((r.left - stageRect.left) / s), y0 = Math.round((r.top - stageRect.top) / s);
+    const x1 = Math.round((r.right - stageRect.left) / s), y1 = Math.round((r.bottom - stageRect.top) / s);
+    return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  }
+  function rr(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ictx.beginPath();
+    ictx.moveTo(x + r, y);
+    ictx.arcTo(x + w, y, x + w, y + h, r);
+    ictx.arcTo(x + w, y + h, x, y + h, r);
+    ictx.arcTo(x, y + h, x, y, r);
+    ictx.arcTo(x, y, x + w, y, r);
+    ictx.closePath();
+    ictx.fill();
+  }
+  const K = '#000', L = '#f00', D = '#0f0';
+  const ease = (v, t, k, dt) => v + (t - v) * Math.min(1, dt * k);
+
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const VISITS = [120, 180, 90, 210, 160, 60, 75];
+
+  function drawInk(now, dt) {
+    ictx.clearRect(0, 0, W, H);
+    ictx.font = "8px 'Press Start 2P'";
+    ictx.textBaseline = 'top';
+    const s = P.scale;
+
+    // Text field
+    {
+      const R = rectOf(elText);
+      const ty = Math.round(R.cy - 4);
+      const tx = Math.round(R.x0 + 12 - elText.scrollLeft / s);
+      ictx.save();
+      ictx.beginPath(); ictx.rect(R.x0 + 6, R.y0, R.w - 12, R.h); ictx.clip();
+      const v = elText.value;
+      const focused = document.activeElement === elText;
+      if (v) {
+        const a = elText.selectionStart ?? v.length, b = elText.selectionEnd ?? v.length;
+        ictx.fillStyle = K; ictx.fillText(v, tx, ty);
+        if (focused && a !== b) {
+          ictx.fillRect(tx + a * 8, ty - 2, (b - a) * 8, 12);
+          ictx.fillStyle = L; ictx.fillText(v.slice(a, b), tx + a * 8, ty);
+        }
+      } else if (!focused) {
+        ictx.fillStyle = D; ictx.fillText(elText.placeholder, tx, ty);
+      }
+      if (focused && elText.selectionStart === elText.selectionEnd && Math.floor(now / 530) % 2 === 0) {
+        ictx.fillStyle = K; ictx.fillRect(tx + (elText.selectionStart || 0) * 8, ty - 2, 1, 12);
+      }
+      ictx.restore();
+    }
+
+    // Segmented control
+    const idx = segRadios.findIndex((r) => r.checked);
+    {
+      S.seg.t = ease(S.seg.t, idx, 14, dt);
+      const a = rectOf(segOpts[0]), b = rectOf(segOpts[1]);
+      const t = S.seg.t;
+      const kx = a.x0 + (b.x0 - a.x0) * t, kw = a.w + (b.w - a.w) * t;
+      ictx.fillStyle = K; rr(Math.round(kx), a.y0, Math.round(kw), a.h, a.h / 2);
+      segOpts.forEach((o, i) => {
+        const R = rectOf(o), txt = o.textContent.trim();
+        const tw = ictx.measureText(txt).width;
+        ictx.fillStyle = Math.abs(t - i) < 0.5 ? L : K;
+        ictx.fillText(txt, Math.round(R.cx - tw / 2), Math.round(R.cy - 4));
+      });
+    }
+
+    // Table / chart
+    {
+      viewAnim = ease(viewAnim, 1, 6, dt);
+      const R = rectOf(elView);
+      if (idx === 0) {
+        ictx.fillStyle = D;
+        ictx.fillText('Day', R.x0, R.y0);
+        const hw = ictx.measureText('Visits').width;
+        ictx.fillText('Visits', R.x1 - hw, R.y0);
+        for (let x = R.x0; x < R.x1; x += 2) ictx.fillRect(x, R.y0 + 11, 1, 1);
+        ictx.fillStyle = K;
+        const rows = Math.min(5, Math.round(5 * Math.min(1, viewAnim * 1.4) + 0.49));
+        for (let i = 0; i < rows; i++) {
+          const y = R.y0 + 16 + i * 10;
+          ictx.fillText(DAYS[i], R.x0, y);
+          const t = String(VISITS[i]), w = ictx.measureText(t).width;
+          ictx.fillText(t, R.x1 - w, y);
+        }
+      } else {
+        const base = R.y1 - 11, areaH = R.h - 16, slot = R.w / 7, bw = Math.max(3, Math.floor(slot) - 5);
+        for (let i = 0; i < 7; i++) {
+          const h = Math.max(1, Math.round((VISITS[i] / 210) * areaH * viewAnim));
+          const x = Math.round(R.x0 + i * slot + (slot - bw) / 2);
+          ictx.fillStyle = K; ictx.fillRect(x, base - h, bw, h);
+          ictx.fillStyle = D;
+          const c = DAYS[i][0], cw = ictx.measureText(c).width;
+          ictx.fillText(c, Math.round(x + bw / 2 - cw / 2), base + 3);
+        }
+        ictx.fillStyle = K; ictx.fillRect(R.x0, base, R.w, 1);
+      }
+    }
+
+    // Switch
+    {
+      const R = rectOf(elToggle), on = elToggle.checked;
+      S.toggle.t = ease(S.toggle.t, on ? 1 : 0, 14, dt);
+      if (on) { ictx.fillStyle = K; rr(R.x0 + 3, R.y0 + 3, R.w - 6, R.h - 6, (R.h - 6) / 2); }
+      const kr = R.h / 2 - 4;
+      const kcx = R.x0 + R.h / 2 + S.toggle.t * (R.w - R.h);
+      ictx.fillStyle = on ? L : K;
+      ictx.beginPath(); ictx.arc(kcx, R.cy, kr, 0, Math.PI * 2); ictx.fill();
+      const LR = rectOf(elTLabel);
+      ictx.fillStyle = K; ictx.fillText('Sound', LR.x0, Math.round(LR.cy - 4));
+    }
+
+    // Button
+    {
+      const R = rectOf(elBtn), pressed = S.btn.down || now < S.btn.until;
+      if (pressed) { ictx.fillStyle = K; rr(R.x0 + 3, R.y0 + 3, R.w - 6, R.h - 6, (R.h - 6) / 2); }
+      const txt = 'Delete project', tw = ictx.measureText(txt).width;
+      ictx.fillStyle = pressed ? L : K;
+      ictx.fillText(txt, Math.round(R.cx - tw / 2), Math.round(R.cy - 4));
+    }
+  }
+
+  function buildShapes(now, dt) {
+    const list = [
+      [elText, S.text, 0], [elSeg, S.seg, 0], [elToggle, S.toggle, 0], [elBtn, S.btn, 0],
+    ];
+    return list.map(([el, st]) => {
+      const R = rectOf(el);
+      const active = st.hover || st.focus;
+      st.lift = ease(st.lift, active ? 1 : 0, 8, dt);
+      const pressed = st === S.btn && (S.btn.down || now < S.btn.until);
+      st.press = ease(st.press, pressed ? 1 : 0, 20, dt);
+      const l = P.lift ? st.lift : 0, p = st.press;
+      const k = (1 + 0.8 * l) * (1 - 0.75 * p);
+      const ox = P.ox * k, oy = P.oy * k;
+      const sp = Math.max(1, P.spread * (1 + 0.45 * l) * (1 - 0.35 * p));
+      const hw = R.w / 2, hh = R.h / 2;
+      return {
+        cx: R.cx, cy: R.cy, hw, hh, r: Math.min(hw, hh),
+        x0: R.x0 - 1, x1: R.x1 + 1, y0: R.y0 - 1, y1: R.y1 + 1,
+        ox, oy, sp, stroke: st.focus ? 3 : 2,
+        sx0: R.x0 + ox - sp, sx1: R.x1 + ox + sp, sy0: R.y0 + oy - sp, sy1: R.y1 + oy + sp,
+      };
+    });
+  }
+
+  function sd(dx, dy, hw, hh, r) {
+    const qx = Math.abs(dx) - hw + r, qy = Math.abs(dy) - hh + r;
+    const ax = qx > 0 ? qx : 0, ay = qy > 0 ? qy : 0;
+    return Math.min(Math.max(qx, qy), 0) + Math.sqrt(ax * ax + ay * ay) - r;
+  }
+
+  function compose(shapes) {
+    const id = ictx.getImageData(0, 0, W, H).data;
+    const mode = P.noise === 'white' ? 0 : P.noise === 'bayer' ? 1 : 2;
+    const g = P.falloff, dens = P.density, showFlips = P.flips;
+    const n = shapes.length;
+    let flips = 0, dots = 0;
+    for (let y = 0; y < H; y++) {
+      const py = y + 0.5;
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x, px = x + 0.5;
+        let s = 0, inside = false, edge = false;
+        for (let j = 0; j < n; j++) {
+          const e = shapes[j];
+          if (px > e.x0 && px < e.x1 && py > e.y0 && py < e.y1) {
+            const d = sd(px - e.cx, py - e.cy, e.hw, e.hh, e.r);
+            if (d <= 0) { inside = true; if (d > -e.stroke) edge = true; }
+          }
+          if (px > e.sx0 && px < e.sx1 && py > e.sy0 && py < e.sy1) {
+            const ds = sd(px - e.cx - e.ox, py - e.cy - e.oy, e.hw, e.hh, e.r);
+            let v = ds <= 0 ? 1 : 1 - ds / e.sp;
+            if (v > 0) { v = Math.pow(v, g) * dens; if (v > s) s = v; }
+          }
+        }
+        let th;
+        if (mode === 0) th = noise[i];
+        else if (mode === 1) th = B8[((y + by) & 7) * 8 + ((x + bx) & 7)];
+        else { const f = 0.06711056 * (x + fo) + 0.00583715 * (y + fo); const u = 52.9829189 * (f - Math.floor(f)); th = u - Math.floor(u); }
+
+        const dot = !inside && s > th ? 1 : 0;
+        if (ticked) {
+          const f = dot !== prev[i] ? (dot ? 1 : 2) : 0;
+          flip[i] = f;
+          if (s > 0.02 && !inside) { dots++; if (f) flips++; }
+        }
+        prev[i] = dot;
+
+        const a = id[i * 4 + 3];
+        let c;
+        if (a > 128) {
+          const r = id[i * 4], gg = id[i * 4 + 1];
+          c = r > 128 ? C.bg : gg > 128 ? C.dot : C.ink;
+        } else if (edge) c = C.ink;
+        else if (inside) c = C.bg;
+        else if (dot) c = showFlips && flip[i] === 1 ? C.fOn : C.dot;
+        else c = showFlips && flip[i] === 2 ? C.fOff : C.bg;
+        buf[i] = c;
+      }
+    }
+    if (ticked) { lastFlips = flips; lastDots = dots; }
+    sctx.putImageData(img, 0, 0);
+  }
+
+  const actEl = $('#activity');
+  let acc = 0, last = performance.now(), lastReadout = 0;
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    stageRect = stage.getBoundingClientRect();
+    ticked = false;
+    if (P.rate > 0) {
+      acc += dt * P.rate;
+      if (acc >= 1) { acc -= Math.floor(acc); tick(); }
+    }
+    drawInk(now, dt);
+    const shapes = buildShapes(now, dt);
+    compose(shapes);
+    if (now - lastReadout > 250) {
+      lastReadout = now;
+      actEl.textContent = P.rate === 0 ? 'Paused' : (lastDots ? (100 * lastFlips / lastDots).toFixed(1) : '0.0') + '%';
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Controls
+  const fmt = {
+    rate: (v) => (+v === 0 ? 'Frozen' : v + ' / s'),
+    churn: (v) => Math.round(v * 100) + '%',
+    oy: (v) => v + ' px', ox: (v) => v + ' px', spread: (v) => v + ' px',
+    falloff: (v) => (+v).toFixed(1), density: (v) => Math.round(v * 100) + '%',
+    scale: (v) => v + '×',
+  };
+  const ctls = [...document.querySelectorAll('[data-key]')];
+  function sync() {
+    ctls.forEach((c) => {
+      const k = c.dataset.key;
+      if (c.type === 'checkbox') c.checked = !!P[k];
+      else c.value = P[k];
+      const o = document.getElementById('o-' + k);
+      if (o && fmt[k]) o.textContent = fmt[k](P[k]);
+    });
+    stage.style.setProperty('--px', P.scale);
+    lcd.hidden = !P.grid;
+    stage.classList.toggle('reveal', P.reveal);
+    $('#c-churn').disabled = P.noise !== 'white';
+    setPalette();
+    save();
+  }
+  const STORE = 'dither-crawl-lab:v1';
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(P)); } catch (e) {}
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE) || 'null');
+      if (s && typeof s === 'object') Object.keys(P).concat(['custom']).forEach((k) => { if (k in s) P[k] = s[k]; });
+      return !!s;
+    } catch (e) { return false; }
+  }
+  colorInputs.forEach((inp) => {
+    inp.addEventListener('input', () => {
+      P.custom = colorInputs.map((c) => c.value);
+      P.palette = 'custom';
+      sync();
+    });
+  });
+  const statusEl = $('#settings-status');
+  const flash = (msg) => { statusEl.textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(() => (statusEl.textContent = ''), 2200); };
+  $('#copy-settings').addEventListener('click', () => {
+    const out = Object.assign({}, P, { colors: (PALETTES[P.palette] || []).slice() });
+    delete out.custom;
+    const text = JSON.stringify(out, null, 2);
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+      flash(ok ? 'Copied' : 'Copy failed. Your browser blocked the clipboard.');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => flash('Copied'), fallback);
+    else fallback();
+  });
+  $('#reset-settings').addEventListener('click', () => {
+    const scale = P.scale;
+    Object.assign(P, { palette: 'sage', grid: true, lift: true, flips: false, reveal: false, custom: null }, PRESETS.reference, { scale });
+    markPreset('reference');
+    sync();
+    flash('Reset to the reference look');
+  });
+  function markPreset(name) {
+    document.querySelectorAll('[data-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === name)));
+  }
+  ctls.forEach((c) => {
+    c.addEventListener('input', () => {
+      const k = c.dataset.key;
+      if (c.type === 'checkbox') P[k] = c.checked;
+      else if (c.tagName === 'SELECT') P[k] = c.value;
+      else P[k] = parseFloat(c.value);
+      if (['rate', 'churn', 'noise', 'oy', 'ox', 'spread', 'falloff', 'density'].includes(k)) markPreset(null);
+      sync();
+      if (k === 'scale') requestAnimationFrame(resize);
+    });
+  });
+  document.querySelectorAll('[data-preset]').forEach((b) => {
+    b.addEventListener('click', () => {
+      Object.assign(P, PRESETS[b.dataset.preset]);
+      markPreset(b.dataset.preset);
+      sync();
+    });
+  });
+
+  const restored = load();
+  if (restored) markPreset(Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k]).every(([a, v]) => P[a] === v)) || null);
+  else {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      P.rate = 0; $('#rm-note').hidden = false; markPreset(null);
+    }
+    if (stage.clientWidth < 520) P.scale = 2;
+  }
+  sync();
+  new ResizeObserver(() => resize()).observe(stage);
+  resize();
+
+  const start = () => requestAnimationFrame((t) => { last = t; frame(t); });
+  const fontReady = document.fonts && document.fonts.load ? document.fonts.load("8px 'Press Start 2P'") : Promise.resolve();
+  Promise.race([fontReady, new Promise((r) => setTimeout(r, 1500))]).then(start, start);
+})();
+</script>
+</body>
+</html>
