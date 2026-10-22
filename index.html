@@ -167,7 +167,19 @@ input.switch { width: calc(var(--px) * 26px); height: calc(var(--px) * 14px); cu
 .tlabel { padding: calc(var(--px) * 1px) 0; }
 button.btn { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 12px); cursor: pointer; white-space: nowrap; }
 
-#stage.reveal .ui { z-index: 4; }
+/* Shape scene: shape area on top, then the name label, then the Morph button. */
+.ui2 {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  height: calc(var(--px) * 200px);
+  padding: calc(var(--px) * 8px) 0 calc(var(--px) * 14px);
+  gap: calc(var(--px) * 6px);
+}
+.shape-area { flex: 1; width: 100%; }
+.shape-name { height: calc(var(--px) * 10px); line-height: calc(var(--px) * 10px); white-space: pre; }
+button.morph { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 14px); cursor: pointer; white-space: nowrap; }
+
+#stage.reveal .ui, #stage.reveal .ui2 { z-index: 4; }
 #stage.reveal .ghost { opacity: 0.75; outline: 1px dashed var(--flip); background: color-mix(in srgb, var(--flip) 10%, transparent); }
 
 /* Control column */
@@ -249,10 +261,23 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
             <button id="f-btn" class="ghost btn" type="button">Delete project</button>
           </div>
         </div>
+        <div class="ui2" id="ui2" hidden>
+          <div class="ghost shape-area" id="f-shape" aria-hidden="true"></div>
+          <div class="ghost shape-name" id="f-shape-name" aria-live="polite">Shell</div>
+          <button id="f-morph" class="ghost morph" type="button">Morph</button>
+        </div>
       </div>
     </div>
 
     <aside class="panel" aria-label="Effect controls">
+      <div class="ctl">
+        <label for="c-scene" class="ctl-top">Scene</label>
+        <select id="c-scene" data-key="scene">
+          <option value="ui">UI controls</option>
+          <option value="shape">Shape morph</option>
+        </select>
+      </div>
+
       <div class="readout" aria-live="off">
         <span class="k">Crawl activity</span>
         <span class="v" id="activity">0.0%</span>
@@ -283,7 +308,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <p class="hint">Share of the noise re-rolled on each update. Low is a slow simmer, 100% is a full reshuffle. Random noise only.</p>
         </div>
         <div class="ctl">
-          <label for="c-noise" class="ctl-top">Noise pattern</label>
+          <label for="c-noise" class="ctl-top">Halo pattern</label>
           <select id="c-noise" data-key="noise">
             <option value="white">Random (stipple)</option>
             <option value="bayer">Ordered 8×8, jittered</option>
@@ -316,6 +341,15 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <input type="range" id="c-density" data-key="density" min="0.2" max="1.2" step="0.05">
         </div>
         <label class="check"><input type="checkbox" id="c-lift" data-key="lift"> Shadow grows on hover and focus</label>
+        <div class="ctl">
+          <label for="c-surface" class="ctl-top">Surface pattern</label>
+          <select id="c-surface" data-key="surface">
+            <option value="b4">Ordered 4×4</option>
+            <option value="b8">Ordered 8×8</option>
+            <option value="static">Random, static</option>
+          </select>
+          <p class="hint">Shading on shapes and ground shadows. Surfaces never crawl.</p>
+        </div>
       </fieldset>
 
       <fieldset>
@@ -323,6 +357,11 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <div class="ctl">
           <div class="ctl-top"><label for="c-scale">Pixel size</label><output id="o-scale" for="c-scale"></output></div>
           <input type="range" id="c-scale" data-key="scale" min="2" max="4" step="1">
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-dot">Dot size</label><output id="o-dot" for="c-dot"></output></div>
+          <input type="range" id="c-dot" data-key="dot" min="0.5" max="1" step="0.05">
+          <p class="hint">Below 100% each dot shrinks inside its cell, leaving a gap like a dot-matrix screen.</p>
         </div>
         <div class="ctl">
           <label for="c-palette" class="ctl-top">Palette</label>
@@ -382,15 +421,21 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
-  const stage = $('#stage'), ui = $('#ui'), screen = $('#screen'), lcd = $('#lcd');
-  const sctx = screen.getContext('2d');
+  const stage = $('#stage'), ui = $('#ui'), ui2 = $('#ui2'), screen = $('#screen'), lcd = $('#lcd');
+  // The low-res buffer is built here, then blitted to the display canvas at device resolution.
+  const low = document.createElement('canvas');
+  const sctx = low.getContext('2d');
+  const dctx = screen.getContext('2d');
   const ink = document.createElement('canvas');
   const ictx = ink.getContext('2d', { willReadFrequently: true });
 
   const elText = $('#f-text'), elSeg = $('#f-seg'), elView = $('#f-view');
   const elToggle = $('#f-toggle'), elTLabel = $('#f-tlabel'), elBtn = $('#f-btn');
+  const elShape = $('#f-shape'), elName = $('#f-shape-name'), elMorph = $('#f-morph');
   const segOpts = [...elSeg.querySelectorAll('label')];
   const segRadios = [...elSeg.querySelectorAll('input')];
+  const rmq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reduced = () => rmq.matches;
 
   const PRESETS = {
     reference: { oy: 1, ox: -1, spread: 4, falloff: 1.7, density: 0.75, rate: 2,  churn: 0.35, noise: 'white' },
@@ -398,7 +443,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     boil:      { oy: 3, ox: 0, spread: 16, falloff: 1.1, density: 1.0, rate: 30, churn: 1.0,  noise: 'white' },
     ordered:   { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 8,  churn: 0.35, noise: 'bayer' },
   };
-  const P = Object.assign({ scale: 3, palette: 'lightgrey', grid: true, lift: true, flips: false, reveal: false }, PRESETS.reference);
+  const P = Object.assign({ scene: 'ui', scale: 3, dot: 1, palette: 'lightgrey', grid: true, lift: true, flips: false, reveal: false, surface: 'b4' }, PRESETS.reference);
 
   // [background, dots, ink]
   const PALETTES = {
@@ -417,20 +462,21 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     const n = parseInt(hex.slice(1), 16);
     return ((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | ((n >> 16) & 255)) >>> 0;
   };
-  let C = {};
+  let C = {}, bgHex = '#d6d6d3';
   function setPalette() {
     if (P.custom) PALETTES.custom = P.custom.slice();
     const p = PALETTES[P.palette] || PALETTES.sage;
     colorInputs.forEach((inp, i) => { if (inp.value !== p[i]) inp.value = p[i]; });
     C = { bg: pack(p[0]), dot: pack(p[1]), ink: pack(p[2]), fOn: pack(FLIP_ON), fOff: pack(FLIP_OFF) };
+    bgHex = p[0];
     stage.style.background = p[0];
+    buildTile();
   }
 
-  // Bayer 8x8
-  const B8 = (() => {
-    const m = [[0, 2], [3, 1]];
-    let b = m;
-    for (let n = 2; n < 8; n *= 2) {
+  // Bayer matrices, normalized to 0..1
+  function bayer(size) {
+    let b = [[0, 2], [3, 1]];
+    for (let n = 2; n < size; n *= 2) {
       const nb = [];
       for (let y = 0; y < n * 2; y++) {
         nb.push([]);
@@ -442,10 +488,13 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       }
       b = nb;
     }
-    return Float32Array.from(b.flat(), (v) => (v + 0.5) / 64);
-  })();
+    return Float32Array.from(b.flat(), (v) => (v + 0.5) / (size * size));
+  }
+  const B8 = bayer(8), B4 = bayer(4);
 
-  let W = 1, H = 1, img, buf, noise, prev, flip, stageRect;
+  let W = 1, H = 1, img, buf, noise, snoise, prev, flip, stageRect;
+  let tone, kind, zbuf;          // surface layer: darkness, kind (1 ground, 2 shape, 3 silhouette), depth
+  let cellPx = 1, dpr = 1, tile = null;
   let bx = 0, by = 0, fo = 0;
   let lastFlips = 0, lastDots = 0, ticked = false;
 
@@ -455,17 +504,41 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     ui.classList.toggle('stack', w < 2 * 125 * s);
     const h = stage.clientHeight;
     const nW = Math.max(1, Math.floor(w / s)), nH = Math.max(1, Math.floor(h / s));
-    if (nW === W && nH === H && img) return;
-    W = nW; H = nH;
-    screen.width = W; screen.height = H;
+    dpr = window.devicePixelRatio || 1;
+    const nc = Math.max(1, Math.round(s * dpr));
+    if (nW === W && nH === H && nc === cellPx && img) return;
+    W = nW; H = nH; cellPx = nc;
+    low.width = W; low.height = H;
+    // Whole number of cells, each cellPx device pixels, so the dot pattern lines up exactly.
+    screen.width = W * nc; screen.height = H * nc;
     screen.style.width = W * s + 'px'; screen.style.height = H * s + 'px';
     ink.width = W; ink.height = H;
     img = sctx.createImageData(W, H);
     buf = new Uint32Array(img.data.buffer);
     noise = new Float32Array(W * H);
     for (let i = 0; i < noise.length; i++) noise[i] = Math.random();
+    snoise = new Float32Array(W * H);
+    for (let i = 0; i < snoise.length; i++) snoise[i] = Math.random();
     prev = new Uint8Array(W * H);
     flip = new Uint8Array(W * H);
+    tone = new Float32Array(W * H);
+    kind = new Uint8Array(W * H);
+    zbuf = new Float32Array(W * H);
+    buildTile();
+  }
+
+  // One cell-sized tile: transparent dot in the middle, screen color around it.
+  function buildTile() {
+    tile = null;
+    const c = cellPx, k = Math.max(1, Math.min(c, Math.round(c * P.dot)));
+    if (P.dot >= 1 || k >= c) return;
+    const t = document.createElement('canvas');
+    t.width = t.height = c;
+    const tc = t.getContext('2d');
+    tc.fillStyle = bgHex; tc.fillRect(0, 0, c, c);
+    const o = Math.floor((c - k) / 2);
+    tc.clearRect(o, o, k, k);
+    tile = dctx.createPattern(t, 'repeat');
   }
 
   function tick() {
@@ -489,22 +562,26 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     seg:    { hover: false, focus: false, lift: 0, press: 0, t: 0 },
     toggle: { hover: false, focus: false, lift: 0, press: 0, t: 0 },
     btn:    { hover: false, focus: false, lift: 0, press: 0, down: false, until: 0 },
+    morph:  { hover: false, focus: false, lift: 0, press: 0, down: false, until: 0 },
   };
   let viewAnim = 1;
   function bindHover(el, st) {
     el.addEventListener('pointerenter', () => (st.hover = true));
-    el.addEventListener('pointerleave', () => { st.hover = false; if (st === S.btn) st.down = false; });
+    el.addEventListener('pointerleave', () => { st.hover = false; if ('down' in st) st.down = false; });
     el.addEventListener('focusin', () => (st.focus = true));
     el.addEventListener('focusout', () => (st.focus = false));
   }
-  bindHover(elText, S.text); bindHover(elSeg, S.seg); bindHover(elToggle, S.toggle); bindHover(elBtn, S.btn);
+  function bindPress(el, st) {
+    el.addEventListener('pointerdown', () => (st.down = true));
+    el.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') st.down = true; });
+    el.addEventListener('keyup', () => (st.down = false));
+    el.addEventListener('click', () => (st.until = performance.now() + 160));
+  }
+  bindHover(elText, S.text); bindHover(elSeg, S.seg); bindHover(elToggle, S.toggle); bindHover(elBtn, S.btn); bindHover(elMorph, S.morph);
+  bindPress(elBtn, S.btn); bindPress(elMorph, S.morph);
   elTLabel.addEventListener('pointerenter', () => (S.toggle.hover = true));
   elTLabel.addEventListener('pointerleave', () => (S.toggle.hover = false));
-  elBtn.addEventListener('pointerdown', () => (S.btn.down = true));
-  window.addEventListener('pointerup', () => (S.btn.down = false));
-  elBtn.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') S.btn.down = true; });
-  elBtn.addEventListener('keyup', () => (S.btn.down = false));
-  elBtn.addEventListener('click', () => (S.btn.until = performance.now() + 160));
+  window.addEventListener('pointerup', () => { S.btn.down = false; S.morph.down = false; });
   segRadios.forEach((r) => r.addEventListener('change', () => (viewAnim = 0)));
 
   function rectOf(el) {
@@ -530,17 +607,12 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const VISITS = [120, 180, 90, 210, 160, 60, 75];
 
-  function drawInk(now, dt) {
-    ictx.clearRect(0, 0, W, H);
-    ictx.font = "8px 'Press Start 2P'";
-    ictx.textBaseline = 'top';
-    const s = P.scale;
-
+  function drawInkUI(now, dt) {
     // Text field
     {
       const R = rectOf(elText);
       const ty = Math.round(R.cy - 4);
-      const tx = Math.round(R.x0 + 12 - elText.scrollLeft / s);
+      const tx = Math.round(R.x0 + 12 - elText.scrollLeft / P.scale);
       ictx.save();
       ictx.beginPath(); ictx.rect(R.x0 + 6, R.y0, R.w - 12, R.h); ictx.clip();
       const v = elText.value;
@@ -632,25 +704,205 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     }
   }
 
+  // ---- Shape scene: superformula morph ----
+  // Each shape: A {m, a, b, n1, n2, n3}, B {m, a, b, n1, n2, n3}, zScale
+  const SHAPES = [
+    { name: 'Shell',        v: [12, 1, 1, 4, 8, 8,    2, 1, 1, 2, 4, 4,   0.5] },
+    { name: 'Gem',          v: [4, 1, 1, 1, 1, 1,     4, 1, 1, 1, 1, 1,   1.0] },
+    { name: 'Seed pod',     v: [4, 1, 1, 12, 15, 15,  3, 1, 1, 3, 4, 4,   1.2] },
+    { name: 'Starfish',     v: [5, 1, 1, 2, 7, 7,     2, 1, 1, 2, 2, 2,   0.3] },
+    { name: 'Alien urchin', v: [8, 1, 1, 0.6, 1, 1,   8, 1, 1, 0.6, 1, 1, 1.0] },
+  ];
+  const MORPH_MS = 900, SCRAMBLE_MS = 600;
+  let shapeIdx = 0, morphFrom = SHAPES[0].v.slice(), morphTo = SHAPES[0].v, morphT0 = -1e9;
+  let yaw = 0.6, shapeCy = null;
+  const easeIO = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  function shapeParams(now) {
+    const e = easeIO(Math.min(1, Math.max(0, (now - morphT0) / MORPH_MS)));
+    return morphFrom.map((a, i) => a + (morphTo[i] - a) * e);
+  }
+
+  const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ';
+  const padC = (s, n) => { const l = Math.floor((n - s.length) / 2); return ' '.repeat(l) + s + ' '.repeat(n - s.length - l); };
+  let scr = { to: SHAPES[0].name, at: [0, 0, 0, 0, 0], t0: -1e9, roll: -1, rnd: '' };
+  function startScramble(a, b, now) {
+    const n = Math.max(a.length, b.length);
+    const at = [];
+    for (let i = 0; i < n; i++) at.push(reduced() ? 0 : SCRAMBLE_MS * (0.75 * i / Math.max(1, n - 1) + 0.25 * Math.random()));
+    scr = { to: padC(b, n), at, t0: now, roll: -1, rnd: '' };
+  }
+  function labelText(now) {
+    const el = now - scr.t0, roll = Math.floor(now / 50);
+    if (roll !== scr.roll) {
+      scr.roll = roll;
+      scr.rnd = Array.from(scr.to, () => CHARS[(Math.random() * CHARS.length) | 0]).join('');
+    }
+    let out = '';
+    for (let i = 0; i < scr.to.length; i++) out += el >= scr.at[i] ? scr.to[i] : scr.rnd[i];
+    return out;
+  }
+
+  function morph() {
+    const now = performance.now();
+    const from = shapeParams(now), oldName = SHAPES[shapeIdx].name;
+    shapeIdx = (shapeIdx + 1) % SHAPES.length;
+    morphFrom = from; morphTo = SHAPES[shapeIdx].v; morphT0 = now;
+    elName.textContent = SHAPES[shapeIdx].name;
+    startScramble(oldName, SHAPES[shapeIdx].name, now);
+  }
+  elMorph.addEventListener('click', morph);
+
+  function sf(t, m, a, b, n1, n2, n3) {
+    const u = (m * t) / 4;
+    const ca = Math.abs(Math.cos(u) / (Math.abs(a) < 1e-4 ? 1e-4 : a));
+    const sb = Math.abs(Math.sin(u) / (Math.abs(b) < 1e-4 ? 1e-4 : b));
+    let s = Math.pow(ca, n2) + Math.pow(sb, n3);
+    if (!(s > 1e-12)) s = 1e-12;
+    const k = Math.abs(n1) < 0.05 ? 0.05 : n1;
+    const r = Math.pow(s, -1 / k);
+    return Number.isFinite(r) ? Math.min(r, 1e4) : 0;
+  }
+
+  const NU = 72, NV = 36, NVERT = (NU + 1) * (NV + 1);
+  const RA = new Float64Array(NU + 1), CT = new Float64Array(NU + 1), ST = new Float64Array(NU + 1);
+  const RB = new Float64Array(NV + 1), CP = new Float64Array(NV + 1), SP = new Float64Array(NV + 1);
+  for (let i = 0; i <= NU; i++) { const t = -Math.PI + (2 * Math.PI * i) / NU; CT[i] = Math.cos(t); ST[i] = Math.sin(t); }
+  for (let j = 0; j <= NV; j++) { const p = -Math.PI / 2 + (Math.PI * j) / NV; CP[j] = Math.cos(p); SP[j] = Math.sin(p); }
+  const VX = new Float64Array(NVERT), VU = new Float64Array(NVERT), VV = new Float64Array(NVERT);
+  const SX = new Float64Array(NVERT), SY = new Float64Array(NVERT);
+  const TILT = (20 * Math.PI) / 180;
+  const LX = -0.55, LU = 0.62, LV = 0.56, LN = Math.hypot(LX, LU, LV);
+
+  function triangle(a, b, c) {
+    const x0 = SX[a], y0 = SY[a], x1 = SX[b], y1 = SY[b], x2 = SX[c], y2 = SY[c];
+    const area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+    if (Math.abs(area) < 1e-6) return;
+    // Flat normal in view space; flip it if it faces away from the camera.
+    const ax = VX[b] - VX[a], au = VU[b] - VU[a], av = VV[b] - VV[a];
+    const bx2 = VX[c] - VX[a], bu = VU[c] - VU[a], bv = VV[c] - VV[a];
+    let nx = au * bv - av * bu, nu = av * bx2 - ax * bv, nv = ax * bu - au * bx2;
+    const nl = Math.hypot(nx, nu, nv);
+    if (nl < 1e-12) return;
+    if (nv < 0) { nx = -nx; nu = -nu; nv = -nv; }
+    const lam = Math.max(0, (nx * LX + nu * LU + nv * LV) / (nl * LN));
+    const dark = 1 - (0.15 + 0.85 * lam);
+    const mnx = Math.max(0, Math.floor(Math.min(x0, x1, x2))), mxx = Math.min(W - 1, Math.ceil(Math.max(x0, x1, x2)));
+    const mny = Math.max(0, Math.floor(Math.min(y0, y1, y2))), mxy = Math.min(H - 1, Math.ceil(Math.max(y0, y1, y2)));
+    const inv = 1 / area, d0 = VV[a], d1 = VV[b], d2 = VV[c];
+    for (let y = mny; y <= mxy; y++) {
+      const py = y + 0.5;
+      for (let x = mnx; x <= mxx; x++) {
+        const px = x + 0.5;
+        const w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * inv;
+        const w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * inv;
+        const w2 = 1 - w0 - w1;
+        if (w0 < -1e-6 || w1 < -1e-6 || w2 < -1e-6) continue;
+        const z = w0 * d0 + w1 * d1 + w2 * d2, i = y * W + x;
+        if (z > zbuf[i]) { zbuf[i] = z; tone[i] = dark; kind[i] = 2; }
+      }
+    }
+  }
+
+  function renderShape(now, dt) {
+    tone.fill(0); kind.fill(0); zbuf.fill(-Infinity);
+    const v = shapeParams(now);
+    if (!reduced()) yaw += dt * ((20 * Math.PI) / 180);
+    const A = rectOf(elShape);
+    const R = Math.max(8, Math.min(A.h * 0.4, A.w * 0.42));
+    // The ground line is fixed; the shape eases up or down so its lowest point rests just above it.
+    const cx = A.cx, gy = A.y0 + 2 * R + 6;
+
+    for (let i = 0; i <= NU; i++) RA[i] = sf(-Math.PI + (2 * Math.PI * i) / NU, v[0], v[1], v[2], v[3], v[4], v[5]);
+    for (let j = 0; j <= NV; j++) RB[j] = sf(-Math.PI / 2 + (Math.PI * j) / NV, v[6], v[7], v[8], v[9], v[10], v[11]);
+
+    // Build, then normalize so the largest extent fits R.
+    let max2 = 1e-12;
+    for (let j = 0; j <= NV; j++) {
+      for (let i = 0; i <= NU; i++) {
+        const k = j * (NU + 1) + i, rc = RA[i] * RB[j] * CP[j];
+        const x = rc * CT[i], y = rc * ST[i], z = RB[j] * SP[j] * v[12];
+        VX[k] = x; VU[k] = y; VV[k] = z;
+        const r2 = x * x + y * y + z * z;
+        if (r2 > max2) max2 = r2;
+      }
+    }
+    const sc = R / Math.sqrt(max2);
+    const cyw = Math.cos(yaw), syw = Math.sin(yaw), ct = Math.cos(TILT), st = Math.sin(TILT);
+    let minX = Infinity, maxX = -Infinity, low = -Infinity;
+    for (let k = 0; k < NVERT; k++) {
+      const x = VX[k], y = VU[k], z = VV[k];
+      // Yaw around the vertical axis, then tilt the top toward the viewer.
+      const X = (x * cyw - y * syw) * sc, dep = (x * syw + y * cyw) * sc, U = z * sc;
+      const U2 = U * ct - dep * st, V2 = U * st + dep * ct;
+      VX[k] = X; VU[k] = U2; VV[k] = V2;
+      SX[k] = cx + X; SY[k] = -U2;
+      if (SX[k] < minX) minX = SX[k];
+      if (SX[k] > maxX) maxX = SX[k];
+      if (SY[k] > low) low = SY[k];
+    }
+    const target = gy - 4 - low;
+    shapeCy = shapeCy === null ? target : ease(shapeCy, target, 5, dt);
+    for (let k = 0; k < NVERT; k++) SY[k] += shapeCy;
+    for (let j = 0; j < NV; j++) {
+      for (let i = 0; i < NU; i++) {
+        const a = j * (NU + 1) + i, b = a + 1, c = a + NU + 2, d = a + NU + 1;
+        triangle(a, b, c); triangle(a, c, d);
+      }
+    }
+    // Silhouette: covered cells with an uncovered neighbour.
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (kind[i] !== 2) continue;
+        if (x === 0 || x === W - 1 || y === 0 || y === H - 1 ||
+            zbuf[i - 1] === -Infinity || zbuf[i + 1] === -Infinity || zbuf[i - W] === -Infinity || zbuf[i + W] === -Infinity) kind[i] = 3;
+      }
+    }
+    // Ground shadow: follows the projected width, static surface dither.
+    const gw = Math.max(2, (0.9 * (maxX - minX)) / 2), gh = Math.max(1, 0.16 * gw);
+    const y0 = Math.max(0, Math.floor(gy - gh)), y1 = Math.min(H - 1, Math.ceil(gy + gh));
+    const x0 = Math.max(0, Math.floor(cx - gw)), x1 = Math.min(W - 1, Math.ceil(cx + gw));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * W + x;
+        if (kind[i]) continue;
+        const dx = (x + 0.5 - cx) / gw, dy = (y + 0.5 - gy) / gh, d2 = dx * dx + dy * dy;
+        if (d2 < 1) { tone[i] = 0.55 * (1 - d2); kind[i] = 1; }
+      }
+    }
+  }
+
+  function drawInkShape(now) {
+    const LR = rectOf(elName), t = labelText(now), tw = ictx.measureText(t).width;
+    ictx.fillStyle = K; ictx.fillText(t, Math.round(LR.cx - tw / 2), Math.round(LR.cy - 4));
+    const R = rectOf(elMorph), pressed = S.morph.down || now < S.morph.until, ins = pressed ? 1 : 0;
+    ictx.fillStyle = K; rr(R.x0 + ins, R.y0 + ins, R.w - 2 * ins, R.h - 2 * ins, (R.h - 2 * ins) / 2);
+    const txt = 'Morph', bw = ictx.measureText(txt).width;
+    ictx.fillStyle = L; ictx.fillText(txt, Math.round(R.cx - bw / 2), Math.round(R.cy - 4) + ins);
+  }
+
   function buildShapes(now, dt) {
-    const list = [
-      [elText, S.text, 0], [elSeg, S.seg, 0], [elToggle, S.toggle, 0], [elBtn, S.btn, 0],
-    ];
+    const list = P.scene === 'shape'
+      ? [[elMorph, S.morph]]
+      : [[elText, S.text], [elSeg, S.seg], [elToggle, S.toggle], [elBtn, S.btn]];
     return list.map(([el, st]) => {
       const R = rectOf(el);
       const active = st.hover || st.focus;
       st.lift = ease(st.lift, active ? 1 : 0, 8, dt);
-      const pressed = st === S.btn && (S.btn.down || now < S.btn.until);
+      const pressed = 'down' in st && (st.down || now < st.until);
       st.press = ease(st.press, pressed ? 1 : 0, 20, dt);
       const l = P.lift ? st.lift : 0, p = st.press;
       const k = (1 + 0.8 * l) * (1 - 0.75 * p);
       const ox = P.ox * k, oy = P.oy * k;
       const sp = Math.max(1, P.spread * (1 + 0.45 * l) * (1 - 0.35 * p));
       const hw = R.w / 2, hh = R.h / 2;
+      // The filled Morph button gets an outside focus ring for keyboard users.
+      const ring = st === S.morph && el.matches(':focus-visible');
+      const m = ring ? 3 : 1;
       return {
         cx: R.cx, cy: R.cy, hw, hh, r: Math.min(hw, hh),
-        x0: R.x0 - 1, x1: R.x1 + 1, y0: R.y0 - 1, y1: R.y1 + 1,
-        ox, oy, sp, stroke: st.focus ? 3 : 2,
+        x0: R.x0 - m, x1: R.x1 + m, y0: R.y0 - m, y1: R.y1 + m,
+        ox, oy, sp, stroke: st.focus ? 3 : 2, ring,
         sx0: R.x0 + ox - sp, sx1: R.x1 + ox + sp, sy0: R.y0 + oy - sp, sy1: R.y1 + oy + sp,
       };
     });
@@ -662,9 +914,10 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     return Math.min(Math.max(qx, qy), 0) + Math.sqrt(ax * ax + ay * ay) - r;
   }
 
-  function compose(shapes) {
+  function compose(shapes, surf) {
     const id = ictx.getImageData(0, 0, W, H).data;
     const mode = P.noise === 'white' ? 0 : P.noise === 'bayer' ? 1 : 2;
+    const smode = P.surface === 'b8' ? 1 : P.surface === 'static' ? 2 : 0;
     const g = P.falloff, dens = P.density, showFlips = P.flips;
     const n = shapes.length;
     let flips = 0, dots = 0;
@@ -678,6 +931,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           if (px > e.x0 && px < e.x1 && py > e.y0 && py < e.y1) {
             const d = sd(px - e.cx, py - e.cy, e.hw, e.hh, e.r);
             if (d <= 0) { inside = true; if (d > -e.stroke) edge = true; }
+            else if (e.ring && d > 1 && d <= 2) edge = true;
           }
           if (px > e.sx0 && px < e.sx1 && py > e.sy0 && py < e.sy1) {
             const ds = sd(px - e.cx - e.ox, py - e.cy - e.oy, e.hw, e.hh, e.r);
@@ -685,6 +939,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
             if (v > 0) { v = Math.pow(v, g) * dens; if (v > s) s = v; }
           }
         }
+        // Halo threshold: crawls.
         let th;
         if (mode === 0) th = noise[i];
         else if (mode === 1) th = B8[((y + by) & 7) * 8 + ((x + bx) & 7)];
@@ -698,14 +953,22 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         }
         prev[i] = dot;
 
+        // Surface threshold: fixed in screen space, never crawls.
+        const kd = surf ? kind[i] : 0;
+        let sth = 1;
+        if (kd) sth = smode === 0 ? B4[(y & 3) * 4 + (x & 3)] : smode === 1 ? B8[(y & 7) * 8 + (x & 7)] : snoise[i];
+
         const a = id[i * 4 + 3];
         let c;
         if (a > 128) {
           const r = id[i * 4], gg = id[i * 4 + 1];
           c = r > 128 ? C.bg : gg > 128 ? C.dot : C.ink;
-        } else if (edge) c = C.ink;
+        } else if (kd === 3) c = C.ink;
+        else if (kd === 2) c = tone[i] > sth ? C.ink : C.bg;
+        else if (edge) c = C.ink;
         else if (inside) c = C.bg;
         else if (dot) c = showFlips && flip[i] === 1 ? C.fOn : C.dot;
+        else if (kd === 1 && tone[i] > sth) c = C.dot;
         else c = showFlips && flip[i] === 2 ? C.fOff : C.bg;
         buf[i] = c;
       }
@@ -714,19 +977,33 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     sctx.putImageData(img, 0, 0);
   }
 
+  // Scale the low-res buffer up to device pixels, then cut the gaps between dots.
+  function blit() {
+    const dw = W * cellPx, dh = H * cellPx;
+    dctx.imageSmoothingEnabled = false;
+    dctx.drawImage(low, 0, 0, dw, dh);
+    if (tile) { dctx.fillStyle = tile; dctx.fillRect(0, 0, dw, dh); }
+  }
+
   const actEl = $('#activity');
   let acc = 0, last = performance.now(), lastReadout = 0;
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if ((window.devicePixelRatio || 1) !== dpr) resize();
     stageRect = stage.getBoundingClientRect();
     ticked = false;
     if (P.rate > 0) {
       acc += dt * P.rate;
       if (acc >= 1) { acc -= Math.floor(acc); tick(); }
     }
-    drawInk(now, dt);
-    const shapes = buildShapes(now, dt);
-    compose(shapes);
+    const shapeScene = P.scene === 'shape';
+    ictx.clearRect(0, 0, W, H);
+    ictx.font = "8px 'Press Start 2P'";
+    ictx.textBaseline = 'top';
+    if (shapeScene) { drawInkShape(now); renderShape(now, dt); }
+    else drawInkUI(now, dt);
+    compose(buildShapes(now, dt), shapeScene);
+    blit();
     if (now - lastReadout > 250) {
       lastReadout = now;
       actEl.textContent = P.rate === 0 ? 'Paused' : (lastDots ? (100 * lastFlips / lastDots).toFixed(1) : '0.0') + '%';
@@ -740,7 +1017,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     churn: (v) => Math.round(v * 100) + '%',
     oy: (v) => v + ' px', ox: (v) => v + ' px', spread: (v) => v + ' px',
     falloff: (v) => (+v).toFixed(1), density: (v) => Math.round(v * 100) + '%',
-    scale: (v) => v + '×',
+    scale: (v) => v + '×', dot: (v) => Math.round(v * 100) + '%',
   };
   const ctls = [...document.querySelectorAll('[data-key]')];
   function sync() {
@@ -752,6 +1029,8 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       if (o && fmt[k]) o.textContent = fmt[k](P[k]);
     });
     stage.style.setProperty('--px', P.scale);
+    ui.hidden = P.scene === 'shape';
+    ui2.hidden = P.scene !== 'shape';
     lcd.hidden = !P.grid;
     stage.classList.toggle('reveal', P.reveal);
     $('#c-churn').disabled = P.noise !== 'white';
@@ -795,7 +1074,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   });
   $('#reset-settings').addEventListener('click', () => {
     const scale = P.scale;
-    Object.assign(P, { palette: 'lightgrey', grid: true, lift: true, flips: false, reveal: false, custom: null }, PRESETS.reference, { scale });
+    Object.assign(P, { palette: 'lightgrey', dot: 1, surface: 'b4', grid: true, lift: true, flips: false, reveal: false, custom: null }, PRESETS.reference, { scale });
     markPreset('reference');
     sync();
     flash('Reset to the reference look');
@@ -811,7 +1090,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       else P[k] = parseFloat(c.value);
       if (['rate', 'churn', 'noise', 'oy', 'ox', 'spread', 'falloff', 'density'].includes(k)) markPreset(null);
       sync();
-      if (k === 'scale') requestAnimationFrame(resize);
+      if (k === 'scale' || k === 'scene') requestAnimationFrame(resize);
     });
   });
   document.querySelectorAll('[data-preset]').forEach((b) => {
@@ -825,7 +1104,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   const restored = load();
   if (restored) markPreset(Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k]).every(([a, v]) => P[a] === v)) || null);
   else {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (reduced()) {
       P.rate = 0; $('#rm-note').hidden = false; markPreset(null);
     }
     if (stage.clientWidth < 520) P.scale = 2;
