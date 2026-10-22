@@ -23,6 +23,8 @@ The text field's real font size matches the canvas font (8 logical pixels per ch
 
 ## Controls
 
+The panel is a stack of accordion sections, in this order: Scene (always shown), Color, the crawl readout and presets, Crawl, Shadow, Screen, Video, Inspect, Settings. Color, Crawl and Shadow start open. The browser remembers which sections you open or close, and Video opens itself when you switch to the Video scene or load a clip.
+
 ### Scene
 
 | Control | Options | Default | What it does |
@@ -59,14 +61,19 @@ Crawl speed, Churn and the crawl-activity readout apply only to halos.
 
 Pixel values are logical pixels, so they scale with Pixel size.
 
+### Color
+
+| Control | Range | Default | What it does |
+|---|---|---|---|
+| Palette | 7 presets + Custom | Light grey, dark grey | Three colors: screen, dots, ink. |
+| Color pickers | any color | from palette | Screen, Dots and Ink. Changing any of them switches to Custom. |
+
 ### Screen
 
 | Control | Range | Default | What it does |
 |---|---|---|---|
 | Pixel size | 2×, 3×, 4× | 3× (2× on narrow screens) | Screen pixels per logical pixel. Bigger = chunkier. The whole layout scales with it. |
 | Dot size | 50–100%, step 5 | 100% | How much of each cell the dot fills. Below 100% the gaps show in screen color, like a dot-matrix screen: empty areas look the same, solid fills show a fine grid. About 70% matches the reference. Gap widths round to whole device pixels. |
-| Palette | 7 presets + Custom | Light grey, dark grey | Three colors: screen, dots, ink. |
-| Color pickers | any color | from palette | Screen, Dots and Ink. Changing any of them switches to Custom. |
 | LCD pixel grid | on/off | on | Faint grid lines between pixels, like a real LCD. |
 
 ### Video
@@ -83,7 +90,7 @@ Pixel values are logical pixels, so they scale with Pixel size.
 
 The clip is drawn into the low-res buffer each frame, letterboxed to fit, and each cell's brightness is mapped in two steps: the lower half dithers between screen and dots, the upper half between dots and ink. The stage takes the clip's aspect ratio, up to 80% of the window height. High-contrast footage works best: a bright subject on a dark background. The video settings are saved; a chosen file isn't, so after a reload the scene opens on the demo again.
 
-**Demo clip.** `media/demo-fish.mp4` (a goldfish on black, 92 s, 640×348, about 650 KB, no audio) loads the first time the Video scene opens. It's re-encoded from the original in `_source/` (kept local) with the 6 px white strip on the right edge cropped off. With reduced motion it opens paused at 6 s, past the empty water at the start.
+**Demo clip.** `media/demo-fish.mp4` (a goldfish on black, 92 s, 640×348, about 650 KB, no audio) loads the first time the Video scene opens. It's re-encoded from the original in `_source/` (kept local) with the 6 px white strip on the right edge cropped off. While the demo plays, a "Choose a video / or drop one here" plate sits over it. The plate is drawn over a real hidden button that opens the file picker; it inverts on hover and keyboard focus, and goes away once you load your own clip. With reduced motion it opens paused at 6 s, past the empty water at the start.
 
 ### Inspect
 

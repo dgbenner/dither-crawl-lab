@@ -182,6 +182,10 @@ button.morph { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 14px)
 /* Video scene: the real <video> plays underneath; the stage takes the clip's shape. */
 .ui3 { position: relative; z-index: 1; aspect-ratio: var(--ar, 16 / 9); max-height: 80vh; }
 .ui3 video { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+.ui3 .vpick {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: calc(var(--px) * 160px); height: calc(var(--px) * 30px); cursor: pointer;
+}
 #stage.dragover { outline: 2px dashed var(--flip); outline-offset: 3px; }
 
 #stage.reveal .ui, #stage.reveal .ui2, #stage.reveal .ui3 { z-index: 4; }
@@ -202,7 +206,19 @@ button.morph { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 14px)
 .readout .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
 .readout .v { font-family: var(--display); font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .readout .s { font-size: 13px; color: var(--muted); }
-fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; min-width: 0; }
+/* Accordion sections */
+.sec { border-top: 1px solid var(--line); padding-top: 12px; margin-top: -6px; }
+.sec > summary {
+  list-style: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--accent); font-weight: 500; padding: 2px 0;
+}
+.sec > summary::-webkit-details-marker { display: none; }
+.sec > summary::after { content: "+"; font-size: 15px; line-height: 1; }
+.sec[open] > summary::after { content: "−"; }
+.sec[open] > summary { margin-bottom: 12px; }
+.sec > summary:hover { color: var(--fg); }
 legend { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); padding: 0; margin-bottom: 10px; font-weight: 500; }
 .ctl { display: grid; gap: 4px; }
 .ctl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13.5px; }
@@ -274,6 +290,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         </div>
         <div class="ui3" id="ui3" hidden>
           <video id="f-video" muted loop playsinline aria-label="Source video"></video>
+          <button id="f-vpick" class="ghost vpick" type="button">Choose a video</button>
         </div>
       </div>
     </div>
@@ -287,6 +304,31 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <option value="video">Video</option>
         </select>
       </div>
+
+      <details class="sec" data-sec="color" open>
+        <summary>Color</summary>
+        <fieldset>
+        <legend class="sr">Color</legend>
+        <div class="ctl">
+          <label for="c-palette" class="ctl-top">Palette</label>
+          <select id="c-palette" data-key="palette">
+            <option value="sage">Sage (like the reference)</option>
+            <option value="dmg">Original green</option>
+            <option value="pocket">Pocket grey</option>
+            <option value="lightgrey">Light grey, dark grey</option>
+            <option value="graphite">Graphite, light grey</option>
+            <option value="c64">C64 blue</option>
+            <option value="amber">Amber on black</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="colors">
+          <label for="c-col-bg">Screen<input type="color" id="c-col-bg"></label>
+          <label for="c-col-dot">Dots<input type="color" id="c-col-dot"></label>
+          <label for="c-col-ink">Ink<input type="color" id="c-col-ink"></label>
+        </div>
+      </fieldset>
+      </details>
 
       <div class="readout" aria-live="off">
         <span class="k">Crawl activity</span>
@@ -306,8 +348,10 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
 
       <p class="note" id="rm-note" hidden>Your system asks for reduced motion, so the crawl starts paused. Raise Crawl speed to see it.</p>
 
-      <fieldset>
-        <legend>Crawl</legend>
+      <details class="sec" data-sec="crawl" open>
+        <summary>Crawl</summary>
+        <fieldset>
+        <legend class="sr">Crawl</legend>
         <div class="ctl">
           <div class="ctl-top"><label for="c-rate">Crawl speed</label><output id="o-rate" for="c-rate"></output></div>
           <input type="range" id="c-rate" data-key="rate" min="0" max="60" step="1">
@@ -327,9 +371,12 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           </select>
         </div>
       </fieldset>
+      </details>
 
-      <fieldset>
-        <legend>Shadow</legend>
+      <details class="sec" data-sec="shadow" open>
+        <summary>Shadow</summary>
+        <fieldset>
+        <legend class="sr">Shadow</legend>
         <div class="ctl">
           <div class="ctl-top"><label for="c-oy">Offset down</label><output id="o-oy" for="c-oy"></output></div>
           <input type="range" id="c-oy" data-key="oy" min="-10" max="16" step="1">
@@ -362,9 +409,12 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <p class="hint">Shading on shapes and ground shadows. Surfaces never crawl.</p>
         </div>
       </fieldset>
+      </details>
 
-      <fieldset>
-        <legend>Screen</legend>
+      <details class="sec" data-sec="screen">
+        <summary>Screen</summary>
+        <fieldset>
+        <legend class="sr">Screen</legend>
         <div class="ctl">
           <div class="ctl-top"><label for="c-scale">Pixel size</label><output id="o-scale" for="c-scale"></output></div>
           <input type="range" id="c-scale" data-key="scale" min="2" max="4" step="1">
@@ -374,29 +424,14 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <input type="range" id="c-dot" data-key="dot" min="0.5" max="1" step="0.05">
           <p class="hint">Below 100% each dot shrinks inside its cell, leaving a gap like a dot-matrix screen.</p>
         </div>
-        <div class="ctl">
-          <label for="c-palette" class="ctl-top">Palette</label>
-          <select id="c-palette" data-key="palette">
-            <option value="sage">Sage (like the reference)</option>
-            <option value="dmg">Original green</option>
-            <option value="pocket">Pocket grey</option>
-            <option value="lightgrey">Light grey, dark grey</option>
-            <option value="graphite">Graphite, light grey</option>
-            <option value="c64">C64 blue</option>
-            <option value="amber">Amber on black</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="colors">
-          <label for="c-col-bg">Screen<input type="color" id="c-col-bg"></label>
-          <label for="c-col-dot">Dots<input type="color" id="c-col-dot"></label>
-          <label for="c-col-ink">Ink<input type="color" id="c-col-ink"></label>
-        </div>
         <label class="check"><input type="checkbox" id="c-grid" data-key="grid"> LCD pixel grid</label>
       </fieldset>
+      </details>
 
-      <fieldset>
-        <legend>Video</legend>
+      <details class="sec" data-sec="video">
+        <summary>Video</summary>
+        <fieldset>
+        <legend class="sr">Video</legend>
         <div class="actions">
           <button type="button" id="v-pick">Choose video…</button>
           <button type="button" id="v-play" disabled>Pause</button>
@@ -426,15 +461,21 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <label class="check"><input type="checkbox" id="c-vinvert" data-key="vinvert"> Invert (for light palettes)</label>
         <p class="hint">Works best with high contrast: a bright subject on a dark background. Brightness maps to two steps, screen to dots, then dots to ink.</p>
       </fieldset>
+      </details>
 
-      <fieldset>
-        <legend>Inspect</legend>
+      <details class="sec" data-sec="inspect">
+        <summary>Inspect</summary>
+        <fieldset>
+        <legend class="sr">Inspect</legend>
         <label class="check"><input type="checkbox" id="c-flips" data-key="flips"> <span><span class="swatch"></span>Highlight crawling pixels</span></label>
         <label class="check"><input type="checkbox" id="c-reveal" data-key="reveal"> Show the hidden HTML</label>
       </fieldset>
+      </details>
 
-      <fieldset>
-        <legend>Settings</legend>
+      <details class="sec" data-sec="settings">
+        <summary>Settings</summary>
+        <fieldset>
+        <legend class="sr">Settings</legend>
         <div class="actions">
           <button type="button" id="copy-settings">Copy settings</button>
           <button type="button" id="reset-settings">Reset</button>
@@ -442,6 +483,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         </div>
         <p class="hint">Your changes are remembered in this browser. Copy settings gives you the numbers to paste into a chat.</p>
       </fieldset>
+      </details>
     </aside>
   </div>
 
@@ -475,7 +517,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   const elText = $('#f-text'), elSeg = $('#f-seg'), elView = $('#f-view');
   const elToggle = $('#f-toggle'), elTLabel = $('#f-tlabel'), elBtn = $('#f-btn');
   const elShape = $('#f-shape'), elName = $('#f-shape-name'), elMorph = $('#f-morph');
-  const ui3 = $('#ui3'), elVideo = $('#f-video');
+  const ui3 = $('#ui3'), elVideo = $('#f-video'), elVPick = $('#f-vpick');
   const vcan = document.createElement('canvas');
   const vctx = vcan.getContext('2d', { willReadFrequently: true });
   const segOpts = [...elSeg.querySelectorAll('label')];
@@ -1029,12 +1071,16 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   let vURL = null;
   const videoReady = () => elVideo.readyState >= 2 && elVideo.videoWidth > 0;
   function composeVideo() {
-    if (!videoReady()) {
+    // Prompt plate over the demo, drawn over the real button underneath it.
+    if (!userClip) {
+      const R = rectOf(elVPick), hot = vpickHover || document.activeElement === elVPick;
       const a = 'Choose a video', b = 'or drop one here';
-      ictx.fillStyle = K;
-      ictx.fillText(a, Math.round(W / 2 - ictx.measureText(a).width / 2), Math.round(H / 2 - 10));
-      ictx.fillStyle = D;
-      ictx.fillText(b, Math.round(W / 2 - ictx.measureText(b).width / 2), Math.round(H / 2 + 4));
+      ictx.fillStyle = K; rr(R.x0, R.y0, R.w, R.h, 4);
+      ictx.fillStyle = hot ? K : L; rr(R.x0 + 1, R.y0 + 1, R.w - 2, R.h - 2, 3);
+      ictx.fillStyle = hot ? L : K;
+      ictx.fillText(a, Math.round(R.cx - ictx.measureText(a).width / 2), Math.round(R.cy - 9));
+      ictx.fillStyle = hot ? L : D;
+      ictx.fillText(b, Math.round(R.cx - ictx.measureText(b).width / 2), Math.round(R.cy + 2));
     }
     const id = ictx.getImageData(0, 0, W, H).data;
     let src = null;
@@ -1094,7 +1140,10 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   const vStatus = $('#v-status'), vPlay = $('#v-play'), vFile = $('#v-file');
   // The demo clip loads the first time the Video scene opens, until you choose your own.
   const DEMO = 'media/demo-fish.mp4';
-  let userPaused = false;
+  let userPaused = false, userClip = false, vpickHover = false;
+  elVPick.addEventListener('pointerenter', () => (vpickHover = true));
+  elVPick.addEventListener('pointerleave', () => (vpickHover = false));
+  elVPick.addEventListener('click', () => vFile.click());
   function loadDemo() {
     elVideo.src = DEMO;
     vStatus.textContent = 'Demo clip loaded. Choose your own or drop one on the screen.';
@@ -1108,6 +1157,9 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     elVideo.src = vURL;
     vStatus.textContent = file.name;
     userPaused = false;
+    userClip = true;
+    elVPick.hidden = true;
+    openSec('video');
     P.scene = 'video';
     sync();
     requestAnimationFrame(resize);
@@ -1203,6 +1255,17 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     setPalette();
     save();
   }
+  // Accordion open/closed state is a per-browser convenience.
+  const SEC_STORE = 'dither-crawl-lab:sections';
+  const secs = [...document.querySelectorAll('details.sec')];
+  try {
+    const o = JSON.parse(localStorage.getItem(SEC_STORE) || 'null');
+    if (o) secs.forEach((d) => { if (d.dataset.sec in o) d.open = !!o[d.dataset.sec]; });
+  } catch (e) {}
+  const saveSecs = () => { try { localStorage.setItem(SEC_STORE, JSON.stringify(Object.fromEntries(secs.map((d) => [d.dataset.sec, d.open])))); } catch (e) {} };
+  secs.forEach((d) => d.addEventListener('toggle', saveSecs));
+  function openSec(name) { const d = secs.find((x) => x.dataset.sec === name); if (d && !d.open) d.open = true; }
+
   const STORE = 'dither-crawl-lab:v1';
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(P)); } catch (e) {}
@@ -1257,6 +1320,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       if (['rate', 'churn', 'noise', 'oy', 'ox', 'spread', 'falloff', 'density'].includes(k)) markPreset(null);
       sync();
       if (k === 'scale' || k === 'scene') requestAnimationFrame(resize);
+      if (k === 'scene' && P.scene === 'video') openSec('video');
     });
   });
   document.querySelectorAll('[data-preset]').forEach((b) => {
