@@ -73,7 +73,7 @@ Pixel values are logical pixels, so they scale with Pixel size.
 
 | Control | Range | Default | What it does |
 |---|---|---|---|
-| Choose video… | any video file | none | Loads a clip from your computer and switches to the Video scene. Dropping a file on the screen does the same. Nothing is uploaded; the file stays in the browser. |
+| Choose video… | any video file | demo clip | Loads a clip from your computer and switches to the Video scene. Dropping a file on the screen does the same. Nothing is uploaded; the file stays in the browser. |
 | Play / Pause | | plays | Starts and stops the clip. It doesn't autoplay with reduced motion on, and it pauses when you leave the Video scene. |
 | Black point | 0–90% | 8% | Source brightness at or below this becomes screen color. |
 | White point | 10–100% | 85% | Source brightness at or above this becomes solid ink. |
@@ -81,7 +81,9 @@ Pixel values are logical pixels, so they scale with Pixel size.
 | Video dither | Static / Crawling | Static | Static uses the Surface pattern, so dots only change when the picture does. Crawling uses the Halo pattern, Crawl speed and Churn. |
 | Invert | on/off | off | Flips brightness, for light palettes where ink is the dark color. |
 
-The clip is drawn into the low-res buffer each frame, letterboxed to fit, and each cell's brightness is mapped in two steps: the lower half dithers between screen and dots, the upper half between dots and ink. The stage takes the clip's aspect ratio, up to 80% of the window height. High-contrast footage works best: a bright subject on a dark background. The video settings are saved; the file isn't, so you choose it again after a reload.
+The clip is drawn into the low-res buffer each frame, letterboxed to fit, and each cell's brightness is mapped in two steps: the lower half dithers between screen and dots, the upper half between dots and ink. The stage takes the clip's aspect ratio, up to 80% of the window height. High-contrast footage works best: a bright subject on a dark background. The video settings are saved; a chosen file isn't, so after a reload the scene opens on the demo again.
+
+**Demo clip.** `media/demo-fish.mp4` (a goldfish on black, 92 s, 640×348, about 650 KB, no audio) loads the first time the Video scene opens. It's re-encoded from the original in `_source/` (kept local) with the 6 px white strip on the right edge cropped off. With reduced motion it opens paused at 6 s, past the empty water at the start.
 
 ### Inspect
 

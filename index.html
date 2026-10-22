@@ -1092,13 +1092,22 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   }
 
   const vStatus = $('#v-status'), vPlay = $('#v-play'), vFile = $('#v-file');
+  // The demo clip loads the first time the Video scene opens, until you choose your own.
+  const DEMO = 'media/demo-fish.mp4';
+  let userPaused = false;
+  function loadDemo() {
+    elVideo.src = DEMO;
+    vStatus.textContent = 'Demo clip loaded. Choose your own or drop one on the screen.';
+    // Paused for reduced motion: skip past the empty water at the start.
+    if (reduced()) elVideo.addEventListener('loadedmetadata', () => (elVideo.currentTime = 6), { once: true });
+  }
   function loadVideo(file) {
     if (!file || !/^video\//.test(file.type)) { vStatus.textContent = 'That file is not a video.'; return; }
     if (vURL) URL.revokeObjectURL(vURL);
     vURL = URL.createObjectURL(file);
     elVideo.src = vURL;
     vStatus.textContent = file.name;
-    if (!reduced()) elVideo.play().catch(() => {});
+    userPaused = false;
     P.scene = 'video';
     sync();
     requestAnimationFrame(resize);
@@ -1111,7 +1120,10 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   const syncPlay = () => (vPlay.textContent = elVideo.paused ? 'Play' : 'Pause');
   elVideo.addEventListener('play', syncPlay);
   elVideo.addEventListener('pause', syncPlay);
-  vPlay.addEventListener('click', () => (elVideo.paused ? elVideo.play().catch(() => {}) : elVideo.pause()));
+  vPlay.addEventListener('click', () => {
+    userPaused = !elVideo.paused;
+    if (elVideo.paused) elVideo.play().catch(() => {}); else elVideo.pause();
+  });
   $('#v-pick').addEventListener('click', () => vFile.click());
   vFile.addEventListener('change', () => { loadVideo(vFile.files[0]); vFile.value = ''; });
   stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('dragover'); });
@@ -1180,7 +1192,11 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     ui.hidden = P.scene !== 'ui';
     ui2.hidden = P.scene !== 'shape';
     ui3.hidden = P.scene !== 'video';
-    if (P.scene !== 'video' && !elVideo.paused) elVideo.pause();
+    if (P.scene !== 'video') { if (!elVideo.paused) elVideo.pause(); }
+    else {
+      if (!elVideo.getAttribute('src')) loadDemo();
+      if (elVideo.paused && !userPaused && !reduced()) elVideo.play().catch(() => {});
+    }
     lcd.hidden = !P.grid;
     stage.classList.toggle('reveal', P.reveal);
     $('#c-churn').disabled = P.noise !== 'white';
