@@ -27,7 +27,7 @@ The text field's real font size matches the canvas font (8 logical pixels per ch
 
 | Control | Options | Default | What it does |
 |---|---|---|---|
-| Scene | UI controls / Shape morph | UI controls | Which scene is on screen. Both share the renderer, palette, pixel size, dot size and dither settings. The inactive scene's HTML is hidden, so it takes no input. |
+| Scene | UI controls / Shape morph / Video | UI controls | Which scene is on screen. Both share the renderer, palette, pixel size, dot size and dither settings. The inactive scene's HTML is hidden, so it takes no input. |
 
 ### Crawl
 
@@ -68,6 +68,20 @@ Pixel values are logical pixels, so they scale with Pixel size.
 | Palette | 7 presets + Custom | Light grey, dark grey | Three colors: screen, dots, ink. |
 | Color pickers | any color | from palette | Screen, Dots and Ink. Changing any of them switches to Custom. |
 | LCD pixel grid | on/off | on | Faint grid lines between pixels, like a real LCD. |
+
+### Video
+
+| Control | Range | Default | What it does |
+|---|---|---|---|
+| Choose video… | any video file | none | Loads a clip from your computer and switches to the Video scene. Dropping a file on the screen does the same. Nothing is uploaded; the file stays in the browser. |
+| Play / Pause | | plays | Starts and stops the clip. It doesn't autoplay with reduced motion on, and it pauses when you leave the Video scene. |
+| Black point | 0–90% | 8% | Source brightness at or below this becomes screen color. |
+| White point | 10–100% | 85% | Source brightness at or above this becomes solid ink. |
+| Gamma | 0.4–2.5 | 1.00 | Above 1 darkens the midtones, below 1 lifts them. |
+| Video dither | Static / Crawling | Static | Static uses the Surface pattern, so dots only change when the picture does. Crawling uses the Halo pattern, Crawl speed and Churn. |
+| Invert | on/off | off | Flips brightness, for light palettes where ink is the dark color. |
+
+The clip is drawn into the low-res buffer each frame, letterboxed to fit, and each cell's brightness is mapped in two steps: the lower half dithers between screen and dots, the upper half between dots and ink. The stage takes the clip's aspect ratio, up to 80% of the window height. High-contrast footage works best: a bright subject on a dark background. The video settings are saved; the file isn't, so you choose it again after a reload.
 
 ### Inspect
 

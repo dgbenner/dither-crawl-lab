@@ -88,7 +88,7 @@ h1 {
   border: 1px solid var(--line); background: var(--bg); color: var(--fg);
 }
 .actions button:hover { border-color: var(--accent); }
-.actions .status { font-size: 12.5px; color: var(--muted); }
+.actions .status { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 
 /* Bezel: the lower-right corner is cut round, like the original handheld. */
 .bezel {
@@ -179,7 +179,13 @@ button.btn { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 12px); 
 .shape-name { height: calc(var(--px) * 10px); line-height: calc(var(--px) * 10px); white-space: pre; }
 button.morph { height: calc(var(--px) * 16px); padding: 0 calc(var(--px) * 14px); cursor: pointer; white-space: nowrap; }
 
-#stage.reveal .ui, #stage.reveal .ui2 { z-index: 4; }
+/* Video scene: the real <video> plays underneath; the stage takes the clip's shape. */
+.ui3 { position: relative; z-index: 1; aspect-ratio: var(--ar, 16 / 9); max-height: 80vh; }
+.ui3 video { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+#stage.dragover { outline: 2px dashed var(--flip); outline-offset: 3px; }
+
+#stage.reveal .ui, #stage.reveal .ui2, #stage.reveal .ui3 { z-index: 4; }
+#stage.reveal .ui3 video { opacity: 0.75; }
 #stage.reveal .ghost { opacity: 0.75; outline: 1px dashed var(--flip); background: color-mix(in srgb, var(--flip) 10%, transparent); }
 
 /* Control column */
@@ -266,6 +272,9 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <div class="ghost shape-name" id="f-shape-name" aria-live="polite">Shell</div>
           <button id="f-morph" class="ghost morph" type="button">Morph</button>
         </div>
+        <div class="ui3" id="ui3" hidden>
+          <video id="f-video" muted loop playsinline aria-label="Source video"></video>
+        </div>
       </div>
     </div>
 
@@ -275,6 +284,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <select id="c-scene" data-key="scene">
           <option value="ui">UI controls</option>
           <option value="shape">Shape morph</option>
+          <option value="video">Video</option>
         </select>
       </div>
 
@@ -386,6 +396,38 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       </fieldset>
 
       <fieldset>
+        <legend>Video</legend>
+        <div class="actions">
+          <button type="button" id="v-pick">Choose video…</button>
+          <button type="button" id="v-play" disabled>Pause</button>
+          <input type="file" id="v-file" accept="video/*" hidden>
+          <span class="status" id="v-status" role="status">No video yet. You can also drop one on the screen.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-vblack">Black point</label><output id="o-vblack" for="c-vblack"></output></div>
+          <input type="range" id="c-vblack" data-key="vblack" min="0" max="0.9" step="0.01">
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-vwhite">White point</label><output id="o-vwhite" for="c-vwhite"></output></div>
+          <input type="range" id="c-vwhite" data-key="vwhite" min="0.1" max="1" step="0.01">
+        </div>
+        <div class="ctl">
+          <div class="ctl-top"><label for="c-vgamma">Gamma</label><output id="o-vgamma" for="c-vgamma"></output></div>
+          <input type="range" id="c-vgamma" data-key="vgamma" min="0.4" max="2.5" step="0.05">
+          <p class="hint">Above 1 darkens the midtones, below 1 lifts them.</p>
+        </div>
+        <div class="ctl">
+          <label for="c-vmode" class="ctl-top">Video dither</label>
+          <select id="c-vmode" data-key="vmode">
+            <option value="static">Static (uses Surface pattern)</option>
+            <option value="crawl">Crawling (uses Halo pattern)</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" id="c-vinvert" data-key="vinvert"> Invert (for light palettes)</label>
+        <p class="hint">Works best with high contrast: a bright subject on a dark background. Brightness maps to two steps, screen to dots, then dots to ink.</p>
+      </fieldset>
+
+      <fieldset>
         <legend>Inspect</legend>
         <label class="check"><input type="checkbox" id="c-flips" data-key="flips"> <span><span class="swatch"></span>Highlight crawling pixels</span></label>
         <label class="check"><input type="checkbox" id="c-reveal" data-key="reveal"> Show the hidden HTML</label>
@@ -433,6 +475,9 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   const elText = $('#f-text'), elSeg = $('#f-seg'), elView = $('#f-view');
   const elToggle = $('#f-toggle'), elTLabel = $('#f-tlabel'), elBtn = $('#f-btn');
   const elShape = $('#f-shape'), elName = $('#f-shape-name'), elMorph = $('#f-morph');
+  const ui3 = $('#ui3'), elVideo = $('#f-video');
+  const vcan = document.createElement('canvas');
+  const vctx = vcan.getContext('2d', { willReadFrequently: true });
   const segOpts = [...elSeg.querySelectorAll('label')];
   const segRadios = [...elSeg.querySelectorAll('input')];
   const rmq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -445,7 +490,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     ordered:   { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 8,  churn: 0.35, noise: 'bayer' },
     amber:     { oy: 0, ox: 0, spread: 3, falloff: 1.7, density: 0.75, rate: 3,  churn: 0.35, noise: 'ign', palette: 'amber' },
   };
-  const P = Object.assign({ scene: 'ui', scale: 3, dot: 1, palette: 'lightgrey', grid: true, lift: true, flips: false, reveal: false, surface: 'b4' }, PRESETS.reference);
+  const P = Object.assign({ scene: 'ui', scale: 3, dot: 1, palette: 'lightgrey', grid: true, lift: true, flips: false, reveal: false, surface: 'b4', vblack: 0.08, vwhite: 0.85, vgamma: 1, vinvert: false, vmode: 'static' }, PRESETS.reference);
 
   // [background, dots, ink]
   const PALETTES = {
@@ -515,6 +560,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     screen.width = W * nc; screen.height = H * nc;
     screen.style.width = W * s + 'px'; screen.style.height = H * s + 'px';
     ink.width = W; ink.height = H;
+    vcan.width = W; vcan.height = H;
     img = sctx.createImageData(W, H);
     buf = new Uint32Array(img.data.buffer);
     noise = new Float32Array(W * H);
@@ -979,6 +1025,102 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     sctx.putImageData(img, 0, 0);
   }
 
+  // ---- Video scene ----
+  let vURL = null;
+  const videoReady = () => elVideo.readyState >= 2 && elVideo.videoWidth > 0;
+  function composeVideo() {
+    if (!videoReady()) {
+      const a = 'Choose a video', b = 'or drop one here';
+      ictx.fillStyle = K;
+      ictx.fillText(a, Math.round(W / 2 - ictx.measureText(a).width / 2), Math.round(H / 2 - 10));
+      ictx.fillStyle = D;
+      ictx.fillText(b, Math.round(W / 2 - ictx.measureText(b).width / 2), Math.round(H / 2 + 4));
+    }
+    const id = ictx.getImageData(0, 0, W, H).data;
+    let src = null;
+    if (videoReady()) {
+      // Letterbox in a color that maps to the screen color.
+      vctx.fillStyle = P.vinvert ? '#fff' : '#000';
+      vctx.fillRect(0, 0, W, H);
+      const vw = elVideo.videoWidth, vh = elVideo.videoHeight, k = Math.min(W / vw, H / vh);
+      const dw = vw * k, dh = vh * k;
+      vctx.imageSmoothingEnabled = true; vctx.imageSmoothingQuality = 'high';
+      vctx.drawImage(elVideo, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      src = vctx.getImageData(0, 0, W, H).data;
+    }
+    const crawl = P.vmode === 'crawl';
+    const mode = P.noise === 'white' ? 0 : P.noise === 'bayer' ? 1 : 2;
+    const smode = P.surface === 'b8' ? 1 : P.surface === 'static' ? 2 : 0;
+    const lo = P.vblack, span = Math.max(0.01, P.vwhite - P.vblack), gam = P.vgamma, inv = P.vinvert;
+    const showFlips = P.flips;
+    let flips = 0, dots = 0;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x, j = i * 4;
+        let lvl = 0, v = 0;
+        if (src) {
+          v = ((0.2126 * src[j] + 0.7152 * src[j + 1] + 0.0722 * src[j + 2]) / 255 - lo) / span;
+          v = v < 0 ? 0 : v > 1 ? 1 : Math.pow(v, gam);
+          if (inv) v = 1 - v;
+          let th;
+          if (crawl) {
+            if (mode === 0) th = noise[i];
+            else if (mode === 1) th = B8[((y + by) & 7) * 8 + ((x + bx) & 7)];
+            else { const f = 0.06711056 * (x + fo) + 0.00583715 * (y + fo); const u = 52.9829189 * (f - Math.floor(f)); th = u - Math.floor(u); }
+          } else th = smode === 0 ? B4[(y & 3) * 4 + (x & 3)] : smode === 1 ? B8[(y & 7) * 8 + (x & 7)] : snoise[i];
+          // Two steps: screen to dots for the lower half, dots to ink for the upper half.
+          const t2 = v * 2;
+          lvl = t2 <= 1 ? (t2 > th ? 1 : 0) : (t2 - 1 > th ? 2 : 1);
+        }
+        let f = 0;
+        if (ticked) {
+          f = lvl !== prev[i] ? 1 : 0;
+          flip[i] = f;
+          if (v > 0.02 && v < 0.98) { dots++; if (f) flips++; }
+        } else f = flip[i];
+        prev[i] = lvl;
+
+        let c;
+        if (id[j + 3] > 128) { const r = id[j], gg = id[j + 1]; c = r > 128 ? C.bg : gg > 128 ? C.dot : C.ink; }
+        else if (showFlips && crawl && f) c = lvl ? C.fOn : C.fOff;
+        else c = lvl === 2 ? C.ink : lvl === 1 ? C.dot : C.bg;
+        buf[i] = c;
+      }
+    }
+    if (ticked) { lastFlips = flips; lastDots = dots; }
+    sctx.putImageData(img, 0, 0);
+  }
+
+  const vStatus = $('#v-status'), vPlay = $('#v-play'), vFile = $('#v-file');
+  function loadVideo(file) {
+    if (!file || !/^video\//.test(file.type)) { vStatus.textContent = 'That file is not a video.'; return; }
+    if (vURL) URL.revokeObjectURL(vURL);
+    vURL = URL.createObjectURL(file);
+    elVideo.src = vURL;
+    vStatus.textContent = file.name;
+    if (!reduced()) elVideo.play().catch(() => {});
+    P.scene = 'video';
+    sync();
+    requestAnimationFrame(resize);
+  }
+  elVideo.addEventListener('loadedmetadata', () => {
+    ui3.style.setProperty('--ar', elVideo.videoWidth + ' / ' + elVideo.videoHeight);
+    vPlay.disabled = false;
+  });
+  elVideo.addEventListener('error', () => { vStatus.textContent = 'This browser can\'t play that video.'; });
+  const syncPlay = () => (vPlay.textContent = elVideo.paused ? 'Play' : 'Pause');
+  elVideo.addEventListener('play', syncPlay);
+  elVideo.addEventListener('pause', syncPlay);
+  vPlay.addEventListener('click', () => (elVideo.paused ? elVideo.play().catch(() => {}) : elVideo.pause()));
+  $('#v-pick').addEventListener('click', () => vFile.click());
+  vFile.addEventListener('change', () => { loadVideo(vFile.files[0]); vFile.value = ''; });
+  stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('dragover'); });
+  stage.addEventListener('dragleave', () => stage.classList.remove('dragover'));
+  stage.addEventListener('drop', (e) => {
+    e.preventDefault(); stage.classList.remove('dragover');
+    if (e.dataTransfer.files.length) loadVideo(e.dataTransfer.files[0]);
+  });
+
   // Scale the low-res buffer up to device pixels, then cut the gaps between dots.
   function blit() {
     const dw = W * cellPx, dh = H * cellPx;
@@ -1002,13 +1144,16 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     ictx.clearRect(0, 0, W, H);
     ictx.font = "8px 'Press Start 2P'";
     ictx.textBaseline = 'top';
-    if (shapeScene) { drawInkShape(now); renderShape(now, dt); }
-    else drawInkUI(now, dt);
-    compose(buildShapes(now, dt), shapeScene);
+    if (P.scene === 'video') composeVideo();
+    else {
+      if (shapeScene) { drawInkShape(now); renderShape(now, dt); }
+      else drawInkUI(now, dt);
+      compose(buildShapes(now, dt), shapeScene);
+    }
     blit();
     if (now - lastReadout > 250) {
       lastReadout = now;
-      actEl.textContent = P.rate === 0 ? 'Paused' : (lastDots ? (100 * lastFlips / lastDots).toFixed(1) : '0.0') + '%';
+      actEl.textContent = P.scene === 'video' && P.vmode === 'static' ? 'Static' : P.rate === 0 ? 'Paused' : (lastDots ? (100 * lastFlips / lastDots).toFixed(1) : '0.0') + '%';
     }
     requestAnimationFrame(frame);
   }
@@ -1020,6 +1165,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     oy: (v) => v + ' px', ox: (v) => v + ' px', spread: (v) => v + ' px',
     falloff: (v) => (+v).toFixed(1), density: (v) => Math.round(v * 100) + '%',
     scale: (v) => v + '×', dot: (v) => Math.round(v * 100) + '%',
+    vblack: (v) => Math.round(v * 100) + '%', vwhite: (v) => Math.round(v * 100) + '%', vgamma: (v) => (+v).toFixed(2),
   };
   const ctls = [...document.querySelectorAll('[data-key]')];
   function sync() {
@@ -1031,8 +1177,10 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       if (o && fmt[k]) o.textContent = fmt[k](P[k]);
     });
     stage.style.setProperty('--px', P.scale);
-    ui.hidden = P.scene === 'shape';
+    ui.hidden = P.scene !== 'ui';
     ui2.hidden = P.scene !== 'shape';
+    ui3.hidden = P.scene !== 'video';
+    if (P.scene !== 'video' && !elVideo.paused) elVideo.pause();
     lcd.hidden = !P.grid;
     stage.classList.toggle('reveal', P.reveal);
     $('#c-churn').disabled = P.noise !== 'white';
@@ -1076,7 +1224,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   });
   $('#reset-settings').addEventListener('click', () => {
     const scale = P.scale;
-    Object.assign(P, { palette: 'lightgrey', dot: 1, surface: 'b4', grid: true, lift: true, flips: false, reveal: false, custom: null }, PRESETS.reference, { scale });
+    Object.assign(P, { palette: 'lightgrey', dot: 1, surface: 'b4', vblack: 0.08, vwhite: 0.85, vgamma: 1, vinvert: false, vmode: 'static', grid: true, lift: true, flips: false, reveal: false, custom: null }, PRESETS.reference, { scale });
     markPreset('reference');
     sync();
     flash('Reset to the reference look');
