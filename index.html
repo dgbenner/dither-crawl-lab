@@ -290,6 +290,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <button type="button" data-preset="calm" aria-pressed="false">Calm</button>
           <button type="button" data-preset="boil" aria-pressed="false">Boiling</button>
           <button type="button" data-preset="ordered" aria-pressed="false">Ordered</button>
+          <button type="button" data-preset="amber" aria-pressed="false">Amber</button>
         </div>
       </div>
 
@@ -442,6 +443,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     calm:      { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 5,  churn: 0.12, noise: 'white' },
     boil:      { oy: 3, ox: 0, spread: 16, falloff: 1.1, density: 1.0, rate: 30, churn: 1.0,  noise: 'white' },
     ordered:   { oy: 4, ox: 0, spread: 12, falloff: 1.7, density: 0.75, rate: 8,  churn: 0.35, noise: 'bayer' },
+    amber:     { oy: 0, ox: 0, spread: 3, falloff: 1.7, density: 0.75, rate: 3,  churn: 0.35, noise: 'ign', palette: 'amber' },
   };
   const P = Object.assign({ scene: 'ui', scale: 3, dot: 1, palette: 'lightgrey', grid: true, lift: true, flips: false, reveal: false, surface: 'b4' }, PRESETS.reference);
 

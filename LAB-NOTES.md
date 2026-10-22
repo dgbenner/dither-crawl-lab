@@ -120,6 +120,9 @@ The cycle is Shell → Gem → Seed pod → Starfish → Alien urchin → Shell.
 | Calm | 5 | 12% | Random | 12 | 1.7 | 75% | 4 |
 | Boiling | 30 | 100% | Random | 16 | 1.1 | 100% | 3 |
 | Ordered | 8 | n/a | Ordered 8×8 | 12 | 1.7 | 75% | 4 |
+| Amber | 3 | n/a | Gradient | 3 | 1.7 | 75% | 0 |
+
+Amber also switches the palette to Amber on black and sets Offset right to 0. The other presets leave the palette alone.
 
 ## Palettes
 
