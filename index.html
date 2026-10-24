@@ -51,7 +51,29 @@ body {
 }
 main { max-width: 1240px; margin: 0 auto; padding-block: 28px 48px; display: grid; gap: 22px; }
 
-header { display: grid; gap: 6px; }
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 24px; align-items: start; }
+header .intro { display: grid; gap: 6px; }
+@media (max-width: 760px) { header { grid-template-columns: minmax(0, 1fr); } }
+
+/* How it's built: three small labels, details in a tip */
+.how-mini { position: relative; display: flex; align-items: center; gap: 8px; padding-top: 8px; }
+.how-mini ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.how-mini li { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.how-mini li + li::before { content: "·"; margin-right: 6px; }
+.info-btn {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; flex: none;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--panel); color: var(--muted); cursor: pointer;
+}
+.info-btn:hover, .info-btn[aria-expanded="true"] { color: var(--fg); border-color: var(--accent); }
+.info-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.how-tip {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(360px, calc(100vw - 32px));
+  display: grid; gap: 12px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+.how-tip h2 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin: 0 0 4px; font-weight: 500; }
+.how-tip p { margin: 0; font-size: 13.5px; color: var(--muted); }
+@media (max-width: 760px) { .how-mini { justify-content: flex-start; } .how-mini ul { justify-content: flex-start; } .how-tip { left: 0; right: auto; } }
 h1 {
   font-family: var(--display);
   font-weight: 400;
@@ -68,7 +90,7 @@ h1 {
 /* Keep the screen in view while adjusting controls. */
 @media (min-width: 901px) {
   .bezel { position: sticky; top: 16px; }
-  .panel { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+  .panel { position: sticky; top: 16px; height: var(--bezel-h, calc(100vh - 32px)); overflow-y: auto; overscroll-behavior: contain; }
 }
 @media (max-width: 900px) {
   .panel {
@@ -233,10 +255,6 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
 .note { font-size: 13px; color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 6px; padding: 8px 10px; margin: 0; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--flip); vertical-align: -1px; margin-right: 4px; }
 
-.how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; border-top: 1px solid var(--line); padding-top: 18px; }
-@media (max-width: 760px) { .how { grid-template-columns: minmax(0, 1fr); } }
-.how h2 { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin: 0 0 6px; font-weight: 500; }
-.how p { margin: 0; font-size: 14px; color: var(--muted); max-width: 52ch; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
 </head>
@@ -244,8 +262,34 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
 
 <main>
   <header>
+    <div class="intro">
     <h1>Dither Crawl Lab</h1>
     <p class="lede">Halftone shadows on live UI. Each shadow is one soft shape, and every pixel is a dot or not depending on a noise value that keeps changing. Pixels deep in the shadow always come out dark, pixels far away always come out empty, and the ones at the edge flip back and forth. That flipping is the crawl.</p>
+    </div>
+    <div class="how-mini">
+      <ul aria-label="How this page is built">
+        <li>Real HTML underneath</li>
+        <li>Custom renderer on top</li>
+        <li>Shadow by threshold</li>
+      </ul>
+      <button type="button" class="info-btn" id="how-btn" aria-expanded="false" aria-controls="how-tip" aria-label="How this page is built">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M6 5.2V9M6 3V3.6" stroke-linecap="round"/></svg>
+      </button>
+      <div class="how-tip" id="how-tip" role="region" aria-label="How this page is built" hidden>
+        <div>
+          <h2>Real HTML underneath</h2>
+          <p>The text field, tabs, switch and button are ordinary form elements with zero opacity. They take the clicks, typing, focus and screen reader. Turn on "Show the hidden HTML" to see them.</p>
+        </div>
+        <div>
+          <h2>Custom renderer on top</h2>
+          <p>A low-resolution canvas reads each element's position and state every frame (value, caret, checked, hover, focus) and redraws it in three colors, then scales up with hard pixel edges.</p>
+        </div>
+        <div>
+          <h2>Shadow by threshold</h2>
+          <p>Shadow strength at each pixel is compared to a noise value. Re-rolling part of the noise each update moves only the in-between pixels, so the core holds still and the fringe crawls.</p>
+        </div>
+      </div>
+    </div>
   </header>
 
   <div class="bench">
@@ -479,20 +523,6 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     </aside>
   </div>
 
-  <section class="how" aria-label="How this page is built">
-    <div>
-      <h2>Real HTML underneath</h2>
-      <p>The text field, tabs, switch and button are ordinary form elements with zero opacity. They take the clicks, typing, focus and screen reader. Turn on "Show the hidden HTML" to see them.</p>
-    </div>
-    <div>
-      <h2>Custom renderer on top</h2>
-      <p>A low-resolution canvas reads each element's position and state every frame (value, caret, checked, hover, focus) and redraws it in three colors, then scales up with hard pixel edges.</p>
-    </div>
-    <div>
-      <h2>Shadow by threshold</h2>
-      <p>Shadow strength at each pixel is compared to a noise value. Re-rolling part of the noise each update moves only the in-between pixels, so the core holds still and the fringe crawls.</p>
-    </div>
-  </section>
 </main>
 
 <script>
@@ -1324,6 +1354,18 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   });
 
   const restored = load();
+  P.scene = 'ui'; // every visit opens on the UI controls scene
+
+  // How-it's-built tip
+  const howBtn = $('#how-btn'), howTip = $('#how-tip');
+  const setTip = (open) => { howTip.hidden = !open; howBtn.setAttribute('aria-expanded', String(open)); };
+  howBtn.addEventListener('click', () => setTip(howTip.hidden));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !howTip.hidden) { setTip(false); howBtn.focus(); } });
+  document.addEventListener('pointerdown', (e) => { if (!howTip.hidden && !e.target.closest('.how-mini')) setTip(false); });
+
+  // The control column is exactly as tall as the screen frame beside it, and scrolls inside.
+  const bezel = document.querySelector('.bezel'), bench = document.querySelector('.bench');
+  new ResizeObserver(() => bench.style.setProperty('--bezel-h', bezel.offsetHeight + 'px')).observe(bezel);
   if (restored) markPreset(Object.keys(PRESETS).find((k) => Object.entries(PRESETS[k]).every(([a, v]) => P[a] === v)) || null);
   else {
     if (reduced()) {
