@@ -264,29 +264,29 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   <header>
     <div class="intro">
     <h1>Dither Crawl Lab</h1>
-    <p class="lede">Halftone shadows on live UI. Each shadow is one soft shape, and every pixel is a dot or not depending on a noise value that keeps changing. Pixels deep in the shadow always come out dark, pixels far away always come out empty, and the ones at the edge flip back and forth. That flipping is the crawl.</p>
+    <p class="lede">A Game Boy–style shadow effect for interface controls. Each shadow is made of dots. The middle of the shadow stays still while the dots around its edge keep changing. That movement is the crawl. The panel controls how it looks.</p>
     </div>
     <div class="how-mini">
       <ul aria-label="How this page is built">
-        <li>Real HTML underneath</li>
-        <li>Custom renderer on top</li>
-        <li>Shadow by threshold</li>
+        <li>Real controls underneath</li>
+        <li>A drawing on top</li>
+        <li>Why only the edge moves</li>
       </ul>
       <button type="button" class="info-btn" id="how-btn" aria-expanded="false" aria-controls="how-tip" aria-label="How this page is built">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M6 5.2V9M6 3V3.6" stroke-linecap="round"/></svg>
       </button>
       <div class="how-tip" id="how-tip" role="region" aria-label="How this page is built" hidden>
         <div>
-          <h2>Real HTML underneath</h2>
-          <p>The text field, tabs, switch and button are ordinary form elements with zero opacity. They take the clicks, typing, focus and screen reader. Turn on "Show the hidden HTML" to see them.</p>
+          <h2>Real controls underneath</h2>
+          <p>The text field, tabs, switch and button are normal web controls, made invisible. They still respond to clicks, typing and the keyboard, and screen readers can use them. Turn on "Show the hidden HTML" to see them.</p>
         </div>
         <div>
-          <h2>Custom renderer on top</h2>
-          <p>A low-resolution canvas reads each element's position and state every frame (value, caret, checked, hover, focus) and redraws it in three colors, then scales up with hard pixel edges.</p>
+          <h2>A drawing on top</h2>
+          <p>A canvas sits over the controls and redraws them every frame as large pixels in three colors. It shows the current state of each control: the text, the cursor, whether the switch is on, and hover and focus.</p>
         </div>
         <div>
-          <h2>Shadow by threshold</h2>
-          <p>Shadow strength at each pixel is compared to a noise value. Re-rolling part of the noise each update moves only the in-between pixels, so the core holds still and the fringe crawls.</p>
+          <h2>Why only the edge moves</h2>
+          <p>Each shadow is dark in the middle and gets lighter toward the edge. Several times a second, the page decides again whether each pixel is a dot. Pixels in the dark middle are always dots, so the middle stays still. Pixels in the lighter edge are dots only some of the time, so the edge keeps changing.</p>
         </div>
       </div>
     </div>
@@ -348,7 +348,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <div class="ctl">
           <label for="c-palette" class="ctl-top">Palette</label>
           <select id="c-palette" data-key="palette">
-            <option value="sage">Sage (like the reference)</option>
+            <option value="sage">Sage</option>
             <option value="dmg">Original green</option>
             <option value="pocket">Pocket grey</option>
             <option value="lightgrey">Light grey, dark grey</option>
@@ -369,12 +369,12 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       <div class="readout" aria-live="off">
         <span class="k">Crawl activity</span>
         <span class="v" id="activity">0.0%</span>
-        <span class="s">of shadow pixels changed on the last noise update</span>
+        <span class="s">of the shadow's dots changed in the last update</span>
       </div>
 
       <div>
         <div class="presets" role="group" aria-label="Presets">
-          <button type="button" data-preset="reference" aria-pressed="true">Reference</button>
+          <button type="button" data-preset="reference" aria-pressed="true">Default</button>
           <button type="button" data-preset="calm" aria-pressed="false">Calm</button>
           <button type="button" data-preset="boil" aria-pressed="false">Boiling</button>
           <button type="button" data-preset="ordered" aria-pressed="false">Ordered</button>
@@ -382,7 +382,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         </div>
       </div>
 
-      <p class="note" id="rm-note" hidden>Your system asks for reduced motion, so the crawl starts paused. Raise Crawl speed to see it.</p>
+      <p class="note" id="rm-note" hidden>Your device is set to reduce motion, so the dots start still. Raise Crawl speed to start them.</p>
 
       <details class="sec" data-sec="crawl" open>
         <summary>Crawl</summary>
@@ -391,20 +391,21 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <div class="ctl">
           <div class="ctl-top"><label for="c-rate">Crawl speed</label><output id="o-rate" for="c-rate"></output></div>
           <input type="range" id="c-rate" data-key="rate" min="0" max="60" step="1">
-          <p class="hint">How often the noise updates. 0 freezes the dots.</p>
+          <p class="hint">How often the dots change. 0 stops them.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-churn">Churn</label><output id="o-churn" for="c-churn"></output></div>
           <input type="range" id="c-churn" data-key="churn" min="0.02" max="1" step="0.01">
-          <p class="hint">Share of the noise re-rolled on each update. Low is a slow simmer, 100% is a full reshuffle. Random noise only.</p>
+          <p class="hint">How many dots change each time. Low changes a few, 100% changes them all. Random pattern only.</p>
         </div>
         <div class="ctl">
           <label for="c-noise" class="ctl-top">Halo pattern</label>
           <select id="c-noise" data-key="noise">
-            <option value="white">Random (stipple)</option>
-            <option value="bayer">Ordered 8×8, jittered</option>
-            <option value="ign">Gradient noise</option>
+            <option value="white">Random</option>
+            <option value="bayer">Ordered grid, shifting</option>
+            <option value="ign">Fine even grain</option>
           </select>
+          <p class="hint">The dot pattern in the shadows around the controls.</p>
         </div>
       </fieldset>
       </details>
@@ -416,33 +417,37 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <div class="ctl">
           <div class="ctl-top"><label for="c-oy">Offset down</label><output id="o-oy" for="c-oy"></output></div>
           <input type="range" id="c-oy" data-key="oy" min="-10" max="16" step="1">
+          <p class="hint">Moves the shadow down. Negative moves it up.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-ox">Offset right</label><output id="o-ox" for="c-ox"></output></div>
           <input type="range" id="c-ox" data-key="ox" min="-10" max="10" step="1">
+          <p class="hint">Moves the shadow right. Negative moves it left.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-spread">Spread</label><output id="o-spread" for="c-spread"></output></div>
           <input type="range" id="c-spread" data-key="spread" min="2" max="32" step="1">
+          <p class="hint">How far the dots reach out from the control.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-falloff">Falloff</label><output id="o-falloff" for="c-falloff"></output></div>
           <input type="range" id="c-falloff" data-key="falloff" min="0.5" max="3" step="0.1">
-          <p class="hint">Higher pulls the dots in tight to the edge.</p>
+          <p class="hint">Higher keeps the dots close to the control.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-density">Density</label><output id="o-density" for="c-density"></output></div>
           <input type="range" id="c-density" data-key="density" min="0.2" max="1.2" step="0.05">
+          <p class="hint">How dark the shadow is.</p>
         </div>
         <label class="check"><input type="checkbox" id="c-lift" data-key="lift"> Shadow grows on hover and focus</label>
         <div class="ctl">
           <label for="c-surface" class="ctl-top">Surface pattern</label>
           <select id="c-surface" data-key="surface">
-            <option value="b4">Ordered 4×4</option>
-            <option value="b8">Ordered 8×8</option>
-            <option value="static">Random, static</option>
+            <option value="b4">Ordered grid, small</option>
+            <option value="b8">Ordered grid, large</option>
+            <option value="static">Random, still</option>
           </select>
-          <p class="hint">Shading on shapes and ground shadows. Surfaces never crawl.</p>
+          <p class="hint">The dot pattern on the shapes and their ground shadows. These dots never move.</p>
         </div>
       </fieldset>
       </details>
@@ -454,11 +459,12 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         <div class="ctl">
           <div class="ctl-top"><label for="c-scale">Pixel size</label><output id="o-scale" for="c-scale"></output></div>
           <input type="range" id="c-scale" data-key="scale" min="2" max="4" step="1">
+          <p class="hint">How big each pixel is on screen.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-dot">Dot size</label><output id="o-dot" for="c-dot"></output></div>
           <input type="range" id="c-dot" data-key="dot" min="0.5" max="1" step="0.05">
-          <p class="hint">Below 100% each dot shrinks inside its cell, leaving a gap like a dot-matrix screen.</p>
+          <p class="hint">Below 100%, each dot gets smaller and leaves a gap around it, like a dot-matrix screen.</p>
         </div>
         <label class="check"><input type="checkbox" id="c-grid" data-key="grid"> LCD pixel grid</label>
       </fieldset>
@@ -472,30 +478,33 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <button type="button" id="v-pick">Choose video…</button>
           <button type="button" id="v-play" disabled>Pause</button>
           <input type="file" id="v-file" accept="video/*" hidden>
-          <span class="status" id="v-status" role="status">No video yet. You can also drop one on the screen.</span>
+          <span class="status" id="v-status" role="status">No video yet. Choose one, or drop a video file on the screen.</span>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-vblack">Black point</label><output id="o-vblack" for="c-vblack"></output></div>
           <input type="range" id="c-vblack" data-key="vblack" min="0" max="0.9" step="0.01">
+          <p class="hint">Parts of the video darker than this show as empty screen.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-vwhite">White point</label><output id="o-vwhite" for="c-vwhite"></output></div>
           <input type="range" id="c-vwhite" data-key="vwhite" min="0.1" max="1" step="0.01">
+          <p class="hint">Parts of the video brighter than this show as solid ink.</p>
         </div>
         <div class="ctl">
           <div class="ctl-top"><label for="c-vgamma">Gamma</label><output id="o-vgamma" for="c-vgamma"></output></div>
           <input type="range" id="c-vgamma" data-key="vgamma" min="0.4" max="2.5" step="0.05">
-          <p class="hint">Above 1 darkens the midtones, below 1 lifts them.</p>
+          <p class="hint">Above 1 makes the video darker, below 1 lighter.</p>
         </div>
         <div class="ctl">
           <label for="c-vmode" class="ctl-top">Video dither</label>
           <select id="c-vmode" data-key="vmode">
-            <option value="static">Static (uses Surface pattern)</option>
+            <option value="static">Still (uses Surface pattern)</option>
             <option value="crawl">Crawling (uses Halo pattern)</option>
           </select>
+          <p class="hint">Whether the dots on the video stay still or keep changing.</p>
         </div>
-        <label class="check"><input type="checkbox" id="c-vinvert" data-key="vinvert"> Invert (for light palettes)</label>
-        <p class="hint">Works best with high contrast: a bright subject on a dark background. Brightness maps to two steps, screen to dots, then dots to ink.</p>
+        <label class="check"><input type="checkbox" id="c-vinvert" data-key="vinvert"> Invert (use with light palettes)</label>
+        <p class="hint">Works best with a bright subject on a dark background.</p>
       </fieldset>
       </details>
 
@@ -517,7 +526,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
           <button type="button" id="reset-settings">Reset</button>
           <span class="status" id="settings-status" role="status"></span>
         </div>
-        <p class="hint">Your changes are remembered in this browser. Copy settings gives you the numbers to paste into a chat.</p>
+        <p class="hint">Your settings are saved in this browser. Copy settings copies them as text you can share or paste back in later.</p>
       </fieldset>
       </details>
     </aside>
@@ -1168,12 +1177,12 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
   elVPick.addEventListener('click', () => vFile.click());
   function loadDemo() {
     elVideo.src = DEMO;
-    vStatus.textContent = 'Demo clip loaded. Choose your own or drop one on the screen.';
+    vStatus.textContent = 'Playing a sample video. Choose your own, or drop one on the screen.';
     // Paused for reduced motion: skip past the empty water at the start.
     if (reduced()) elVideo.addEventListener('loadedmetadata', () => (elVideo.currentTime = 6), { once: true });
   }
   function loadVideo(file) {
-    if (!file || !/^video\//.test(file.type)) { vStatus.textContent = 'That file is not a video.'; return; }
+    if (!file || !/^video\//.test(file.type)) { vStatus.textContent = 'That file isn\'t a video.'; return; }
     if (vURL) URL.revokeObjectURL(vURL);
     vURL = URL.createObjectURL(file);
     elVideo.src = vURL;
@@ -1190,7 +1199,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     ui3.style.setProperty('--ar', elVideo.videoWidth + ' / ' + elVideo.videoHeight);
     vPlay.disabled = false;
   });
-  elVideo.addEventListener('error', () => { vStatus.textContent = 'This browser can\'t play that video.'; });
+  elVideo.addEventListener('error', () => { vStatus.textContent = 'This browser can\'t play that video. Try an MP4.'; });
   const syncPlay = () => (vPlay.textContent = elVideo.paused ? 'Play' : 'Pause');
   elVideo.addEventListener('play', syncPlay);
   elVideo.addEventListener('pause', syncPlay);
@@ -1246,7 +1255,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
 
   // Controls
   const fmt = {
-    rate: (v) => (+v === 0 ? 'Frozen' : v + ' / s'),
+    rate: (v) => (+v === 0 ? 'Stopped' : v + ' / s'),
     churn: (v) => Math.round(v * 100) + '%',
     oy: (v) => v + ' px', ox: (v) => v + ' px', spread: (v) => v + ' px',
     falloff: (v) => (+v).toFixed(1), density: (v) => Math.round(v * 100) + '%',
@@ -1318,7 +1327,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       document.body.appendChild(ta); ta.select();
       let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
       ta.remove();
-      flash(ok ? 'Copied' : 'Copy failed. Your browser blocked the clipboard.');
+      flash(ok ? 'Copied' : 'Couldn\'t copy. Your browser blocked the clipboard.');
     };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => flash('Copied'), fallback);
     else fallback();
@@ -1328,7 +1337,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     Object.assign(P, { palette: 'lightgrey', dot: 1, surface: 'b4', vblack: 0.08, vwhite: 0.85, vgamma: 1, vinvert: false, vmode: 'static', grid: true, lift: true, flips: false, reveal: false, custom: null }, PRESETS.reference, { scale });
     markPreset('reference');
     sync();
-    flash('Reset to the reference look');
+    flash('Reset to the default settings');
   });
   function markPreset(name) {
     document.querySelectorAll('[data-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === name)));

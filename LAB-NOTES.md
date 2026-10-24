@@ -23,6 +23,8 @@ The text field's real font size matches the canvas font (8 logical pixels per ch
 
 ## Controls
 
+On-screen wording was rewritten in plain language on 2026-10-24 (source: `_source/copy-edits-2026-10-24.txt`).
+
 The panel is a stack of accordion sections, in this order: Scene (always shown), Color, the crawl readout and presets, Crawl, Shadow, Screen, Video, Inspect, Settings. Color, Crawl and Shadow start open. The browser remembers which sections you open or close, and Video opens itself when you switch to the Video scene or load a clip.
 
 ### Scene
@@ -35,17 +37,17 @@ The panel is a stack of accordion sections, in this order: Scene (always shown),
 
 | Control | Range | Default | What it does |
 |---|---|---|---|
-| Crawl speed | 0–60 updates/s | 2 | How often the noise changes. 0 freezes the dots completely. |
+| Crawl speed | 0–60 updates/s | 2 | How often the noise changes. 0 stops the dots completely (shown as "Stopped"). |
 | Churn | 2–100% | 35% | Share of the noise re-rolled on each update. Low = slow simmer, 100% = full reshuffle every update. Applies to Random noise only. |
-| Halo pattern | Random / Ordered 8×8 / Gradient | Random | The texture of the halo dots (see below). Formerly "Noise pattern". |
+| Halo pattern | Random / Ordered grid, shifting / Fine even grain | Random | The texture of the halo dots (see below). Formerly "Noise pattern". |
 
 Crawl speed, Churn and the crawl-activity readout apply only to halos.
 
 **Halo patterns**
 
-- **Random (stipple):** scattered dots with no grid. Closest to the reference video.
-- **Ordered 8×8, jittered:** classic Bayer cross-hatch, the textbook Game Boy dither look. Each update shifts the whole pattern to a new offset, so the crawl reads as a shimmer instead of a boil.
-- **Gradient noise:** interleaved gradient noise, an even, fine-grained pattern between the other two. Each update jumps to a new offset.
+- **Random:** scattered dots with no grid. Closest to the reference video.
+- **Ordered grid, shifting:** classic Bayer cross-hatch, the textbook Game Boy dither look. Each update shifts the whole pattern to a new offset, so the crawl reads as a shimmer instead of a boil.
+- **Fine even grain:** interleaved gradient noise, an even, fine-grained pattern between the other two. Each update jumps to a new offset.
 
 ### Shadow
 
@@ -57,7 +59,7 @@ Crawl speed, Churn and the crawl-activity readout apply only to halos.
 | Falloff | 0.5–3.0 | 1.7 | How fast the dots thin out. Higher pulls them in tight to the edge; lower gives a long, soft fade. |
 | Density | 20–120% | 75% | Overall darkness of the shadow. Above 100% makes a solid core. |
 | Shadow grows on hover and focus | on/off | on | Hover or keyboard focus raises the element: the offset grows 80% and the spread 45%. Pressing the button pushes it down (offset shrinks 75%). |
-| Surface pattern | Ordered 4×4 / Ordered 8×8 / Random, static | Ordered 4×4 | The dither on shaded shapes and ground shadows. A fixed pattern with no offset changes: surfaces never crawl, whatever the crawl speed. |
+| Surface pattern | Ordered grid, small / Ordered grid, large / Random, still | Ordered grid, small | The dither on shaded shapes and ground shadows. A fixed pattern with no offset changes: surfaces never crawl, whatever the crawl speed. |
 
 Pixel values are logical pixels, so they scale with Pixel size.
 
@@ -85,7 +87,7 @@ Pixel values are logical pixels, so they scale with Pixel size.
 | Black point | 0–90% | 8% | Source brightness at or below this becomes screen color. |
 | White point | 10–100% | 85% | Source brightness at or above this becomes solid ink. |
 | Gamma | 0.4–2.5 | 1.00 | Above 1 darkens the midtones, below 1 lifts them. |
-| Video dither | Static / Crawling | Static | Static uses the Surface pattern, so dots only change when the picture does. Crawling uses the Halo pattern, Crawl speed and Churn. |
+| Video dither | Still / Crawling | Still | Still uses the Surface pattern, so dots only change when the picture does. Crawling uses the Halo pattern, Crawl speed and Churn. |
 | Invert | on/off | off | Flips brightness, for light palettes where ink is the dark color. |
 
 The clip is drawn into the low-res buffer each frame, letterboxed to fit, and each cell's brightness is mapped in two steps: the lower half dithers between screen and dots, the upper half between dots and ink. The stage takes the clip's aspect ratio, up to 80% of the window height. High-contrast footage works best: a bright subject on a dark background. The video settings are saved; a chosen file isn't, so after a reload the scene opens on the demo again.
@@ -107,7 +109,7 @@ The clip is drawn into the low-res buffer each frame, letterboxed to fit, and ea
 
 - Changes are saved in your browser automatically, including the current scene. Settings saved by an older version still load; new keys take their defaults.
 - **Copy settings** copies the current values and colors as JSON, ready to paste into a chat.
-- **Reset** returns to the Reference preset, the Light grey, dark grey palette, 100% dot size and Ordered 4×4 surfaces, keeping your pixel size and scene.
+- **Reset** returns to the Default preset, the Light grey, dark grey palette, 100% dot size and Ordered 4×4 surfaces, keeping your pixel size and scene.
 
 ---
 
@@ -139,7 +141,7 @@ The cycle is Shell → Gem → Seed pod → Starfish → Alien urchin → Shell.
 
 | Preset | Speed | Churn | Noise | Spread | Falloff | Density | Offset down |
 |---|---|---|---|---|---|---|---|
-| Reference | 2 | 35% | Random | 4 | 1.7 | 75% | 1 |
+| Default | 2 | 35% | Random | 4 | 1.7 | 75% | 1 |
 | Calm | 5 | 12% | Random | 12 | 1.7 | 75% | 4 |
 | Boiling | 30 | 100% | Random | 16 | 1.1 | 100% | 3 |
 | Ordered | 8 | n/a | Ordered 8×8 | 12 | 1.7 | 75% | 4 |
