@@ -25,7 +25,7 @@ The text field's real font size matches the canvas font (8 logical pixels per ch
 
 On-screen wording was rewritten in plain language on 2026-10-24 (source: `_source/copy-edits-2026-10-24.txt`).
 
-The panel is a stack of accordion sections, in this order: Scene (always shown), Color, the crawl readout and presets, Crawl, Shadow, Screen, Video, Inspect, Settings. Color, Crawl and Shadow start open. The browser remembers which sections you open or close, and Video opens itself when you switch to the Video scene or load a clip.
+The panel is a stack of accordion sections, in this order: Scene (always shown), Color, the crawl readout and presets, Crawl, Shadow, Screen, Video, Inspect, Settings. Every section starts collapsed when the page loads. Video opens itself when you switch to the Video scene or load a clip.
 
 ### Scene
 

@@ -341,7 +341,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
         </select>
       </div>
 
-      <details class="sec" data-sec="color" open>
+      <details class="sec" data-sec="color">
         <summary>Color</summary>
         <fieldset>
         <legend class="sr">Color</legend>
@@ -384,7 +384,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
 
       <p class="note" id="rm-note" hidden>Your device is set to reduce motion, so the dots start still. Raise Crawl speed to start them.</p>
 
-      <details class="sec" data-sec="crawl" open>
+      <details class="sec" data-sec="crawl">
         <summary>Crawl</summary>
         <fieldset>
         <legend class="sr">Crawl</legend>
@@ -410,7 +410,7 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
       </fieldset>
       </details>
 
-      <details class="sec" data-sec="shadow" open>
+      <details class="sec" data-sec="shadow">
         <summary>Shadow</summary>
         <fieldset>
         <legend class="sr">Shadow</legend>
@@ -1286,15 +1286,9 @@ select { width: 100%; font: inherit; font-size: 13.5px; padding: 6px 8px; border
     setPalette();
     save();
   }
-  // Accordion open/closed state is a per-browser convenience.
-  const SEC_STORE = 'dither-crawl-lab:sections';
+  // Every panel section starts collapsed on page load.
   const secs = [...document.querySelectorAll('details.sec')];
-  try {
-    const o = JSON.parse(localStorage.getItem(SEC_STORE) || 'null');
-    if (o) secs.forEach((d) => { if (d.dataset.sec in o) d.open = !!o[d.dataset.sec]; });
-  } catch (e) {}
-  const saveSecs = () => { try { localStorage.setItem(SEC_STORE, JSON.stringify(Object.fromEntries(secs.map((d) => [d.dataset.sec, d.open])))); } catch (e) {} };
-  secs.forEach((d) => d.addEventListener('toggle', saveSecs));
+  secs.forEach((d) => (d.open = false));
   function openSec(name) { const d = secs.find((x) => x.dataset.sec === name); if (d && !d.open) d.open = true; }
 
   const STORE = 'dither-crawl-lab:v1';
